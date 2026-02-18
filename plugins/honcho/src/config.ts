@@ -68,7 +68,12 @@ export function loadConfig(): HonchoCursorConfig | null {
   if (configExists()) {
     try {
       const content = readFileSync(CONFIG_FILE, "utf-8");
-      const fileConfig = JSON.parse(content) as HonchoCursorConfig;
+      const raw = JSON.parse(content);
+      // Map legacy claudePeer field to cursorPeer (config shared with claude-honcho)
+      if (raw.claudePeer && !raw.cursorPeer) {
+        raw.cursorPeer = raw.claudePeer;
+      }
+      const fileConfig = raw as HonchoCursorConfig;
       return mergeWithEnvVars(fileConfig);
     } catch {
       // Fall through to env-only config
@@ -118,6 +123,14 @@ function mergeWithEnvVars(config: HonchoCursorConfig): HonchoCursorConfig {
   }
   if (process.env.HONCHO_PEER_NAME) {
     config.peerName = process.env.HONCHO_PEER_NAME;
+  }
+  const cursorPeerEnv = process.env.HONCHO_CURSOR_PEER || process.env.HONCHO_CLAUDE_PEER;
+  if (cursorPeerEnv) {
+    config.cursorPeer = cursorPeerEnv;
+  }
+  // Ensure cursorPeer always has a fallback
+  if (!config.cursorPeer) {
+    config.cursorPeer = "cursor";
   }
   if (process.env.HONCHO_ENABLED === "false") {
     config.enabled = false;

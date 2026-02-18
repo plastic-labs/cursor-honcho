@@ -1,5 +1,6 @@
 {
   "name": "honcho-dev",
+  "displayName": "Honcho SDK Tools",
   "version": "0.1.0",
   "description": "Skills for building AI applications with the Honcho SDK",
   "author": {
@@ -10,5 +11,5 @@
   "repository": "https://github.com/plastic-labs/cursor-honcho",
   "license": "MIT",
   "keywords": ["sdk", "development", "migration", "honcho"],
-  "skills": "./skills/"
+  "logo": "assets/logo.svg"
 }
