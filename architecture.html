@@ -256,16 +256,17 @@
 
   <div class="mermaid">
 %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1f3150', 'primaryTextColor': '#c9d1d9', 'primaryBorderColor': '#3d6ea5', 'lineColor': '#3d6ea5', 'secondaryColor': '#162030', 'tertiaryColor': '#11151c', 'edgeLabelBackground': '#0b0e14', 'fontSize': '14px' }, 'flowchart': { 'nodeSpacing': 30, 'rankSpacing': 40 }}}%%
-flowchart LR
+flowchart TD
     U["User Prompt"] -->|beforeSubmit| Q["Message Queue"]
     Q --> H["Honcho API"]
     H --> O["Observe + Dream"]
     O --> C["Conclusions"]
     C --> R["Represent"]
     R -->|sessionStart| CTX["Context Injection"]
-    CTX --> A["Agent"]
-    A -->|stop / response| H
     R <-->|MCP| D["Dialectic Chat"]
+    CTX --> A["Agent"]
+    D --> A
+    A -->|stop / response| H
 
     style U fill:#162030,stroke:#7eb8f6,color:#c9d1d9
     style Q fill:#1f3150,stroke:#3d6ea5,color:#c9d1d9
@@ -325,9 +326,9 @@ flowchart TD
     SS["sessionStart<br/>Load context"] --> BSP["beforeSubmitPrompt<br/>Save + retrieve"]
     BSP --> PTU["postToolUse<br/>Log activity"]
     PTU --> AAT["afterAgentThought<br/>Capture reasoning"]
-    AAT --> AAR["afterAgentResponse<br/>Capture response"]
-    AAR --> SAS["subagentStop<br/>Capture subagent"]
-    SAS --> PC["preCompact<br/>Memory anchor"]
+    PTU --> AAR["afterAgentResponse<br/>Capture response"]
+    PTU --> SAS["subagentStop<br/>Capture subagent"]
+    BSP --> PC["preCompact<br/>Memory anchor"]
     PC --> ST["stop<br/>Final response"]
     ST --> SE["sessionEnd<br/>Upload transcript"]
 

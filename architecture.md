@@ -29,16 +29,18 @@
 
 Every prompt, tool call, reasoning trace, and response is a signal about what you're building and how you think. The plugin makes that signal legible to Honcho -- and Honcho feeds back consolidated identity at the start of every session, before every prompt, and during context compaction. Everything runs as Bun subprocesses invoked by Cursor's hook system. No daemon, no polling -- the agent lifecycle itself is the trigger.
 
-```
-User Prompt --> beforeSubmit --> Message Queue --> Honcho API --> Observe + Dream
-                                                                       |
-                                                                  Conclusions
-                                                                       |
-                                                                   Represent
-                                                                       |
-                           Agent <-- Context Injection <-- sessionStart |
-                             |                                         |
-                        stop / response --------> Honcho API     MCP <--> Dialectic Chat
+```mermaid
+flowchart TD
+    U["User Prompt"] -->|beforeSubmit| Q["Message Queue"]
+    Q --> H["Honcho API"]
+    H --> O["Observe + Dream"]
+    O --> C["Conclusions"]
+    C --> R["Represent"]
+    R -->|sessionStart| CTX["Context Injection"]
+    R <-->|MCP| D["Dialectic Chat"]
+    CTX --> A["Agent"]
+    D --> A
+    A -->|stop / response| H
 ```
 
 ### Agent --> Honcho
@@ -77,9 +79,16 @@ This means:
 
 Cursor exposes nine lifecycle hooks. Each fires as a subprocess, receives JSON on stdin, and returns JSON on stdout. The plugin registers a handler for every hook, each as a thin 3-line shim that imports and calls the real handler from `src/hooks/`.
 
-```
-sessionStart --> beforeSubmitPrompt --> postToolUse --> afterAgentThought
-    --> afterAgentResponse --> subagentStop --> preCompact --> stop --> sessionEnd
+```mermaid
+flowchart TD
+    SS["sessionStart<br/>Load context"] --> BSP["beforeSubmitPrompt<br/>Save + retrieve"]
+    BSP --> PTU["postToolUse<br/>Log activity"]
+    PTU --> AAT["afterAgentThought<br/>Capture reasoning"]
+    PTU --> AAR["afterAgentResponse<br/>Capture response"]
+    PTU --> SAS["subagentStop<br/>Capture subagent"]
+    BSP --> PC["preCompact<br/>Memory anchor"]
+    PC --> ST["stop<br/>Final response"]
+    ST --> SE["sessionEnd<br/>Upload transcript"]
 ```
 
 ### Hook registry
