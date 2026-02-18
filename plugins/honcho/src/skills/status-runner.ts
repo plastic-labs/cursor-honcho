@@ -7,7 +7,7 @@ import {
   getCursorSettingsPath,
 } from "../config.js";
 import { checkHooksInstalled, verifyCommandAvailable } from "../install.js";
-import { loadIdCache, loadContextCache, getClaudeInstanceId } from "../cache.js";
+import { loadIdCache, loadContextCache, getInstanceId } from "../cache.js";
 import * as s from "../styles.js";
 
 function status(): void {
@@ -45,7 +45,7 @@ function status(): void {
 
   const idCache = loadIdCache();
   const contextCache = loadContextCache();
-  const instanceId = getClaudeInstanceId();
+  const instanceId = getInstanceId();
 
   console.log("");
   console.log(s.section("Cache"));

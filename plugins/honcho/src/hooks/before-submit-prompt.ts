@@ -8,7 +8,7 @@ import {
   incrementMessageCount,
   shouldRefreshKnowledgeGraph,
   markKnowledgeGraphRefreshed,
-  getClaudeInstanceId,
+  getInstanceId,
   chunkContent,
 } from "../cache.js";
 import { logHook, logApiCall, logCache, setLogContext } from "../log.js";
@@ -117,7 +117,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   // Start upload immediately (we'll await before exit)
   let uploadPromise: Promise<void> | null = null;
   if (config.saveMessages !== false) {
-    uploadPromise = uploadMessageAsync(config, cwd, prompt);
+    uploadPromise = uploadMessageAsync(config, cwd, prompt, hookInput.model);
   }
 
   // Track message count for threshold-based knowledge graph refresh
@@ -182,7 +182,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   process.exit(0);
 }
 
-async function uploadMessageAsync(config: any, cwd: string, prompt: string): Promise<void> {
+async function uploadMessageAsync(config: any, cwd: string, prompt: string, model?: string): Promise<void> {
   logApiCall("session.addMessages", "POST", `user prompt (${prompt.length} chars)`);
   const honcho = new Honcho(getHonchoClientOptions(config));
   const sessionName = getSessionName(cwd);
@@ -192,12 +192,13 @@ async function uploadMessageAsync(config: any, cwd: string, prompt: string): Pro
   const userPeer = await honcho.peer(config.peerName);
 
   // Chunk large messages to stay under API size limits
-  const instanceId = getClaudeInstanceId();
+  const instanceId = getInstanceId();
   const chunks = chunkContent(prompt);
   const messages = chunks.map(chunk =>
     userPeer.message(chunk, {
       metadata: {
         instance_id: instanceId || undefined,
+        model,
         session_affinity: sessionName,
       }
     })

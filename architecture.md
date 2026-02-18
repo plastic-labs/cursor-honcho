@@ -11,16 +11,16 @@
 01. [Data Flow & Core Thesis](#data-flow--core-thesis)
 02. [Why This Matters](#why-this-matters)
 03. [Hook Architecture](#hook-architecture)
-04. [Shared Memory](#shared-memory)
-05. [Peer Architecture](#peer-architecture)
-06. [Cache System](#cache-system)
-07. [Context Lifecycle](#context-lifecycle)
-08. [MCP Server](#mcp-server)
-09. [Cursor-Exclusive Features](#cursor-exclusive-features)
-10. [Configuration](#configuration)
-11. [File Structure](#file-structure)
-12. [Progress](#progress)
-13. [Demo: Session Lifecycle](#demo-session-lifecycle)
+04. [Peer Architecture](#peer-architecture)
+05. [Cache System](#cache-system)
+06. [Context Lifecycle](#context-lifecycle)
+07. [MCP Server](#mcp-server)
+08. [Cursor-Exclusive Features](#cursor-exclusive-features)
+09. [Configuration](#configuration)
+10. [File Structure](#file-structure)
+11. [Progress](#progress)
+12. [Demo: Session Lifecycle](#demo-session-lifecycle)
+13. [Cross-Surface Integration](#cross-surface-integration)
 14. [P.S. -- API Surface](#ps--api-surface)
 
 ---
@@ -48,7 +48,7 @@ flowchart TD
 - **Queue** -- every user prompt is appended to a local JSONL queue (~1-3ms) before async upload, ensuring zero message loss even if the API is slow
 - **Chunk** -- messages exceeding 24KB are split at newline/space boundaries with `[Part N/M]` prefixes
 - **Attribute** -- user messages carry the user peer ID; tool calls, reasoning, and responses carry the cursor peer ID
-- **Session** -- deterministic name `{peerName}-{basename(cwd)}`, shared with Claude Code for cross-surface convergence
+- **Session** -- deterministic name `{peerName}-{basename(cwd)}`, consistent across restarts for continuous context accumulation
 
 ### Honcho --> Agent
 
@@ -70,7 +70,7 @@ This means:
 - **Sessions inherit context.** The agent knows your preferences, your architecture, and your recent work before you say anything. No preamble needed.
 - **Understanding compounds.** The 100th session benefits from the 99 before it. Conclusions consolidate through dreaming into an increasingly precise identity.
 - **Compaction is lossless.** When Cursor truncates context, the memory anchor preserves everything Honcho knows. The agent loses conversation history but retains identity.
-- **Multiple surfaces converge.** The same identity built from Cursor sessions also informs Claude Code, Obsidian, or any other Honcho-connected tool. Code in Cursor; the understanding follows you everywhere.
+- **Multiple surfaces can converge.** The same identity built from Cursor sessions can optionally inform other Honcho-connected tools. Set a shared workspace to carry context across surfaces.
 - **You stay in control.** Everything is opt-in. `HONCHO_ENABLED=false` disables the plugin. `HONCHO_SAVE_MESSAGES=false` stops message upload. No data leaves your machine without an API key.
 
 ---
@@ -121,30 +121,6 @@ Every hook receives a `CursorHookInput` JSON object on stdin containing `convers
 
 ---
 
-## Shared Memory
-
-The plugin shares its Honcho workspace and local cache with [claude-honcho](https://github.com/plastic-labs/claude-honcho) (the Claude Code plugin). Both tools write to the same `claude_code` workspace by default, use the same `~/.honcho/` cache directory, and target the same user peer. Only the AI peer differs.
-
-### Claude Code
-- AI peer: `claude`
-- Settings: `~/.claude/settings.json`
-- Hooks: `hooks/` in settings
-- 6 hook events
-- Output: `{ result }` wrapper
-
-### Cursor
-- AI peer: `cursor`
-- Settings: `~/.cursor/hooks.json`
-- Hooks: `.cursor-plugin/` manifests
-- 9 hook events
-- Output: direct JSON
-
-When both plugins are active, the session accumulates messages from both surfaces. Honcho's observation pipeline sees the combined signal -- your Claude Code conversations and your Cursor sessions contribute to the same identity. Conclusions derived from one surface inform context on the other.
-
-> **Convergence by default.** No configuration needed. Both plugins target `claude_code` workspace and share `~/.honcho/cache.json`, `context-cache.json`, `message-queue.jsonl`, and `claude-context.md`. Install both and they converge automatically.
-
----
-
 ## Peer Architecture
 
 Honcho uses an observer/observed model. The **observed** peer is the user whose identity is being built. The **observer** is the AI whose responses and behavior are tracked. Each hook handler resolves both peers at session start and configures observation flags.
@@ -162,14 +138,14 @@ Peer configuration is set via fire-and-forget calls during `sessionStart`. Both 
 
 ## Cache System
 
-Five cache layers at `~/.honcho/` provide local-first reliability and reduce API calls. Every cache is JSON or JSONL, human-readable, and shared between Claude Code and Cursor.
+Five cache layers at `~/.honcho/` provide local-first reliability and reduce API calls. Every cache is JSON or JSONL, human-readable.
 
 | Layer | File | Purpose | Eviction |
 |-------|------|---------|----------|
 | ID Cache | `cache.json` | Workspace name->ID, peer name->ID, session cwd->ID mappings | Manual or `clearAllCaches()` |
 | Context Cache | `context-cache.json` | User context, cursor context, summaries with TTL | TTL (default 300s) or message threshold (default 30) |
 | Message Queue | `message-queue.jsonl` | Append-only buffer of unsent messages; fields: content, peerId, cwd, timestamp | Marked `uploaded` after successful API call |
-| Work Log | `claude-context.md` | Activity log: tool calls, file writes, subagent results, session summaries | Max entries (default 50) |
+| Work Log | `work-context.md` | Activity log: tool calls, file writes, subagent results, session summaries | Max entries (default 50) |
 | Git State | `git-state.json` | Per-cwd: branch, commit, message, dirty files, timestamp | Overwritten per session start |
 
 ### Context cache TTL
@@ -226,11 +202,11 @@ The MCP server uses `CURSOR_PROJECT_DIR` (Cursor's env var) to determine the ses
 
 ## Cursor-Exclusive Features
 
-Cursor's plugin system supports declarative Markdown components that Claude Code doesn't have: custom subagents, slash commands, and always-applied rules. The plugin leverages all three.
+Cursor's plugin system supports declarative Markdown components: custom subagents, slash commands, and always-applied rules. The plugin leverages all three.
 
-### Three exclusive hooks
+### Additional hooks
 
-Cursor exposes three hook events that Claude Code lacks:
+Three hook events for deep agent observability:
 
 - `subagentStop` -- fires when a spawned subagent completes. The handler captures the agent type, duration, and result (truncated to 500 chars), uploading it as a cursor peer message
 - `afterAgentThought` -- fires after deep reasoning. Only captures substantial traces (>500 chars AND >3 seconds), filtering out trivial internal reasoning
@@ -261,7 +237,7 @@ A read-only subagent (`agents/memory-analyst.md`) specialized in deep Honcho que
 |----------|----------|---------|-------------|
 | `HONCHO_API_KEY` | Yes | -- | Honcho API key |
 | `HONCHO_PEER_NAME` | No | `$USER` | User peer name (the observed identity) |
-| `HONCHO_WORKSPACE` | No | `claude_code` | Workspace name (shared with Claude Code) |
+| `HONCHO_WORKSPACE` | No | `cursor` | Workspace name |
 | `HONCHO_CURSOR_PEER` | No | `cursor` | AI peer name. Fallback: `HONCHO_CLAUDE_PEER` |
 | `HONCHO_ENDPOINT` | No | production | `local` for localhost:8000, or a full URL |
 | `HONCHO_SAVE_MESSAGES` | No | `true` | Upload messages to Honcho. `false` disables |
@@ -279,7 +255,7 @@ A read-only subagent (`agents/memory-analyst.md`) specialized in deep Honcho que
 | `contextRefresh.ttlSeconds` | `300` | Context cache lifetime before forced refresh |
 | `contextRefresh.messageThreshold` | `30` | Messages before knowledge graph refresh |
 | `contextRefresh.skipDialectic` | `false` | Skip dialectic chat calls (faster but less nuanced) |
-| `localContext.maxEntries` | `50` | Max entries in `claude-context.md` work log |
+| `localContext.maxEntries` | `50` | Max entries in `work-context.md` work log |
 | `messageUpload.summarizeAssistant` | `false` | Summarize assistant messages before upload |
 
 ### API endpoints
@@ -371,7 +347,7 @@ plugins/honcho-dev/
 - [x] Memory analyst subagent
 - [x] /recall and /remember slash commands
 - [x] Always-on memory rule
-- [x] Shared memory with Claude Code (same workspace, cache directory, user peer)
+- [x] Cross-surface integration (optional shared workspace with other Honcho tools)
 - [x] Interview and status skills
 - [x] honcho-dev plugin: integrate, migrate-py, migrate-ts skills
 - [ ] Integration testing against live Cursor sessions
@@ -392,7 +368,7 @@ End-to-end walkthrough of a single Cursor session with Honcho active.
 ## Honcho Memory System Active
 - User: eri
 - AI: cursor
-- Workspace: claude_code
+- Workspace: cursor
 - Session: cursor-honcho
 
 ## eri's Profile
@@ -453,7 +429,15 @@ Added error handling to cache.ts, modified config.ts...
 
 ### 5. Session ends
 
-`sessionEnd` parses the transcript JSONL, extracts up to 40 assistant messages (prioritizing explanatory content over tool announcements), uploads them with cursor peer attribution, generates a self-summary, and writes it to `claude-context.md`.
+`sessionEnd` parses the transcript JSONL, extracts up to 40 assistant messages (prioritizing explanatory content over tool announcements), uploads them with cursor peer attribution, generates a self-summary, and writes it to `work-context.md`.
+
+---
+
+## Cross-Surface Integration
+
+Optionally share memory with other Honcho-connected tools (e.g. [claude-honcho](https://github.com/plastic-labs/claude-honcho) for Claude Code). Set `HONCHO_WORKSPACE` to the same value on both sides and the session accumulates messages from all surfaces. Honcho's observation pipeline sees the combined signal -- conclusions derived from one surface inform context on the other.
+
+> **Cross-surface setup.** Set `HONCHO_WORKSPACE="shared"` (or any common name) in both tools. The AI peers remain separate (`cursor` vs `claude`), so Honcho distinguishes who said what while maintaining a unified model of you. The local cache at `~/.honcho/` is shared automatically.
 
 ---
 
@@ -482,5 +466,5 @@ The hook-to-identity pipeline works through conversational primitives. These wou
 |----------|-----|
 | Bulk message ingestion endpoint | Session end uploads 40+ messages in serial `addMessages` calls. One batch endpoint would cut latency by 10x |
 | Streaming context SSE | Context injection at session start could stream incrementally instead of blocking on 5 parallel calls |
-| Cross-session conclusion dedup | Cursor and Claude Code sessions may derive duplicate conclusions from overlapping signals |
+| Cross-session conclusion dedup | Multiple sessions may derive duplicate conclusions from overlapping signals |
 | Lightweight context ping | A fast "has anything changed?" check would let beforeSubmitPrompt skip fetches when the representation hasn't evolved |
