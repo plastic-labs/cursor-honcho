@@ -1,4 +1,5 @@
 ---
+name: status
 description: Show current Honcho memory status and configuration
 user-invocable: true
 ---
@@ -22,5 +23,5 @@ Run `/honcho:status` to see the current state of the Honcho memory system.
 ## Implementation
 
 ```bash
-bun run ${CURSOR_PLUGIN_ROOT}/src/skills/status-runner.ts
+bun run ./src/skills/status-runner.ts
 ```

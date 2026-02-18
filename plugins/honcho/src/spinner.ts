@@ -1,6 +1,6 @@
 /**
- * A beautiful wave spinner with colors, inspired by Claude Code's thinking animation
- * Writes directly to /dev/tty to bypass Claude Code's stream capture
+ * A beautiful wave spinner with colors
+ * Writes directly to /dev/tty to bypass Cursor's stream capture
  */
 
 import { openSync, writeSync, closeSync } from "fs";
@@ -320,7 +320,7 @@ const fadeDots = [
 ];
 
 /**
- * Play a cooldown animation when Claude shuts down
+ * Play a cooldown animation when the session shuts down
  * Returns a promise that resolves when animation completes
  * Automatically uses ASCII-safe characters if Unicode isn't supported
  */

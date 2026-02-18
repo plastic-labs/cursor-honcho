@@ -2,10 +2,10 @@ import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionForPath, setSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
 import {
   setCachedUserContext,
-  setCachedClaudeContext,
-  loadClaudeLocalContext,
+  setCachedAIContext,
+  loadLocalWorkContext,
   resetMessageCount,
-  setClaudeInstanceId,
+  setInstanceId,
   getCachedGitState,
   setCachedGitState,
   detectGitChanges,
@@ -63,7 +63,7 @@ export async function handleSessionStart(): Promise<void> {
   const isBackground = hookInput.is_background_agent || false;
 
   if (cursorInstanceId) {
-    setClaudeInstanceId(cursorInstanceId);
+    setInstanceId(cursorInstanceId);
   }
 
   const sessionName = getSessionName(cwd);
@@ -185,9 +185,9 @@ export async function handleSessionStart(): Promise<void> {
       contextParts.push(`## Git Activity Since Last Session\n${changeDescriptions}`);
     }
 
-    const localCursorContext = loadClaudeLocalContext();
+    const localCursorContext = loadLocalWorkContext();
     if (localCursorContext) {
-      contextParts.push(`## Cursor Local Context (What I Was Working On)\n${localCursorContext.slice(0, 2000)}`);
+      contextParts.push(`## CURSOR Local Context (What I Was Working On)\n${localCursorContext.slice(0, 2000)}`);
     }
 
     // Context-aware dialectic queries
@@ -270,7 +270,7 @@ export async function handleSessionStart(): Promise<void> {
 
     if (cursorContextResult.status === "fulfilled" && cursorContextResult.value) {
       const context = cursorContextResult.value as any;
-      setCachedClaudeContext(context);
+      setCachedAIContext(context);
       const rep = context.representation;
       if (rep) {
         const repText = formatRepresentation(rep);
