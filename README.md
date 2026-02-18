@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="Honcho x Cursor" width="100%" />
+</p>
+
 # Honcho Plugins for Cursor
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
