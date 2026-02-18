@@ -20,25 +20,6 @@ Give Cursor persistent memory that survives context wipes, session restarts, and
 
 ---
 
-## Installation
-
-Add the marketplace to Cursor:
-
-```
-/plugin marketplace add plastic-labs/cursor-honcho
-```
-
-Then install the plugin(s) you want:
-
-```
-/plugin install honcho@honcho
-/plugin install honcho-dev@honcho
-```
-
-Restart Cursor for the plugins to take effect.
-
----
-
 # `honcho` Plugin
 
 **Persistent memory for Cursor using [Honcho](https://honcho.dev).**
@@ -79,20 +60,93 @@ Then reload your shell:
 source ~/.zshrc
 ```
 
-### Step 3: Install & Restart
+### Step 3: Install
 
-```
-/plugin marketplace add plastic-labs/cursor-honcho
-/plugin install honcho@honcho
+#### From the Cursor Marketplace
+
+Search for **Honcho Memory** in the [Cursor Marketplace](https://cursor.com/marketplace) and click **Add to Cursor**.
+
+#### Manual Install (from GitHub)
+
+Clone the repo and install dependencies:
+
+```bash
+git clone https://github.com/plastic-labs/cursor-honcho.git
+cd cursor-honcho/plugins/honcho
+bun install
 ```
 
-Restart Cursor. You should see the Honcho pixel art and memory loading on startup.
+Then add Honcho to any project by creating a `.cursor/` directory with three config files:
+
+**`.cursor/hooks.json`** -- registers all lifecycle hooks:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/session-start.ts" }
+    ],
+    "sessionEnd": [
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/session-end.ts" }
+    ],
+    "beforeSubmitPrompt": [
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/before-submit-prompt.ts" }
+    ],
+    "postToolUse": [
+      {
+        "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/post-tool-use.ts",
+        "matcher": "Write|Edit|Shell|Task|MCP"
+      }
+    ],
+    "preCompact": [
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/pre-compact.ts" }
+    ],
+    "stop": [
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/stop.ts" }
+    ],
+    "subagentStop": [
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/subagent-stop.ts" }
+    ],
+    "afterAgentThought": [
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/after-agent-thought.ts" }
+    ],
+    "afterAgentResponse": [
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/after-agent-response.ts" }
+    ]
+  }
+}
+```
+
+Replace `/path/to/cursor-honcho` with the absolute path where you cloned the repo.
+
+**`.cursor/mcp.json`** -- connects the MCP server:
+
+```json
+{
+  "mcpServers": {
+    "honcho": {
+      "command": "bun",
+      "args": ["run", "/path/to/cursor-honcho/plugins/honcho/mcp-server.ts"]
+    }
+  }
+}
+```
+
+**`.cursor/rules/honcho-memory.mdc`** -- copy or symlink the rule:
+
+```bash
+mkdir -p .cursor/rules
+cp /path/to/cursor-honcho/plugins/honcho/rules/honcho-memory.mdc .cursor/rules/
+```
+
+Restart Cursor. Memory loads automatically on the next chat.
 
 ### Step 4: (Optional) Interview
 
-```
-/honcho:interview
-```
+Tell the AI:
+
+> Run the honcho interview
 
 Cursor will interview you about your preferences to kickstart your profile.
 
@@ -194,8 +248,9 @@ The AI peers remain separate (`cursor` vs `claude`), so Honcho distinguishes who
 ### "Not configured" or no memory loading
 
 1. Check your API key: `echo $HONCHO_API_KEY`
-2. Check the plugin is installed: `/plugin`
-3. Restart Cursor after changes
+2. Check `.cursor/hooks.json` exists in your project
+3. Open View > Output > "Hooks" to see hook execution logs
+4. Restart Cursor after changes
 
 ### Memory not persisting
 
@@ -213,6 +268,10 @@ export HONCHO_ENDPOINT="local"  # Uses localhost:8000
 export HONCHO_ENABLED="false"
 ```
 
+### Debugging hooks
+
+Open the **Hooks output channel** in Cursor (View > Output, select "Hooks" from the dropdown) to see what hooks are firing and any errors.
+
 ---
 
 # `honcho-dev` Plugin
@@ -225,19 +284,15 @@ export HONCHO_ENABLED="false"
 | `/honcho-dev:migrate-py` | Migrate Python code to latest Honcho SDK |
 | `/honcho-dev:migrate-ts` | Migrate TypeScript code to latest Honcho SDK |
 
-```
-/plugin install honcho-dev@honcho
-```
+Install via the [Cursor Marketplace](https://cursor.com/marketplace) or copy the skills from `plugins/honcho-dev/skills/` into your project's `.cursor/` directory.
 
 ---
 
 ## Uninstalling
 
-```
-/plugin uninstall honcho@honcho
-/plugin uninstall honcho-dev@honcho
-/plugin marketplace remove honcho
-```
+**Marketplace install**: Remove via Cursor Settings > Plugins.
+
+**Manual install**: Delete the `.cursor/hooks.json`, `.cursor/mcp.json`, and `.cursor/rules/honcho-memory.mdc` files from your project.
 
 ---
 
@@ -249,7 +304,7 @@ MIT -- see [LICENSE](LICENSE)
 
 ## Links
 
-- **Issues**: [GitHub Issues](https://github.com/plastic-labs/honcho/issues)
+- **Issues**: [GitHub Issues](https://github.com/plastic-labs/cursor-honcho/issues)
 - **Discord**: [Join the Community](https://discord.gg/plasticlabs)
 - **X (Twitter)**: [@honchodotdev](https://x.com/honchodotdev)
 - **Plastic Labs**: [plasticlabs.ai](https://plasticlabs.ai)
