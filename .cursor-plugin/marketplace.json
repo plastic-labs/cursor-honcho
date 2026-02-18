@@ -1,0 +1,29 @@
+{
+  "name": "honcho",
+  "owner": {
+    "name": "Plastic Labs",
+    "email": "hello@plasticlabs.ai"
+  },
+  "metadata": {
+    "description": "Honcho plugins for Cursor - memory, development tools, and more",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "honcho",
+      "source": "./plugins/honcho",
+      "description": "Persistent memory for Cursor sessions using Honcho",
+      "version": "0.1.0",
+      "keywords": ["memory", "context", "persistence"],
+      "strict": false
+    },
+    {
+      "name": "honcho-dev",
+      "source": "./plugins/honcho-dev",
+      "description": "Skills for building AI applications with the Honcho SDK",
+      "version": "0.1.0",
+      "keywords": ["sdk", "development", "migration"],
+      "strict": false
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "description": "Honcho memory hooks for Cursor sessions",
+  "hooks": {
+    "sessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/session-start.ts",
+            "timeout": 30000
+          }
+        ]
+      }
+    ],
+    "sessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/session-end.ts",
+            "timeout": 30000
+          }
+        ]
+      }
+    ],
+    "postToolUse": [
+      {
+        "matcher": "Write|Edit|Shell|Task|MCP",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/post-tool-use.ts",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/before-submit-prompt.ts",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "preCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/pre-compact.ts",
+            "timeout": 20000
+          }
+        ]
+      }
+    ],
+    "stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/stop.ts",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "subagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/subagent-stop.ts",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "afterAgentThought": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/after-agent-thought.ts",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/after-agent-response.ts",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}

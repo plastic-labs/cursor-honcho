@@ -1,0 +1,6 @@
+{
+  "honcho": {
+    "command": "bun",
+    "args": ["run", "${CURSOR_PLUGIN_ROOT}/mcp-server.ts"]
+  }
+}
