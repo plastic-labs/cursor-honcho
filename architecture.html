@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cursor-honcho: Architecture</title>
+<style>
+  /* ── Dark theme (default) — Kitty grays + Honcho/Kitty blues ── */
+  :root, [data-theme="dark"] {
+    --bg:             #181818;
+    --bg-surface:     #232323;
+    --bg-elevated:    #2F2F2F;
+    --bg-code:        #141414;
+    --fg:             #B7DBFF;
+    --fg-bright:      #FFFFFF;
+    --fg-muted:       #7C7C7C;
+    --fg-subtle:      #5A5A5A;
+    --accent:         #90CFFA;
+    --accent-dim:     #0091EA;
+    --accent-glow:    rgba(144, 207, 250, 0.08);
+    --orange:         #e6a855;
+    --red:            #f47067;
+    --blue-bright:    #6FC2FB;
+    --blue-light:     #B7DBFF;
+    --blue-mid:       #29B6F6;
+    --blue-deep:      #0091EA;
+    --border:         #3A3A3A;
+    --border-subtle:  #2A2A2A;
+    --radius:         6px;
+    --font-sans:      'New York', ui-serif, 'Iowan Old Style', 'Apple Garamond', Baskerville, 'Times New Roman', 'Noto Emoji', serif;
+    --font-mono:      'Departure Mono', 'Noto Emoji', monospace;
+    --toggle-icon:    "\263E";
+  }
+
+  /* ── Light theme ── */
+  [data-theme="light"] {
+    --bg:             #FFFFFF;
+    --bg-surface:     #F9FAFB;
+    --bg-elevated:    #F0F2F6;
+    --bg-code:        #F0F2F6;
+    --fg:             #374151;
+    --fg-bright:      #111827;
+    --fg-muted:       #6B7280;
+    --fg-subtle:      #9CA3AF;
+    --accent:         #0091EA;
+    --accent-dim:     #B7DBFF;
+    --accent-glow:    rgba(0, 145, 234, 0.06);
+    --orange:         #C07D1C;
+    --red:            #D32F2F;
+    --blue-bright:    #0077C2;
+    --blue-light:     #0091EA;
+    --blue-mid:       #005BA1;
+    --blue-deep:      #004C8C;
+    --border:         #E5E7EB;
+    --border-subtle:  #F3F4F6;
+    --toggle-icon:    "\263C";
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; scroll-padding-top: 2rem; }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.7;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .container { max-width: 860px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+
+  /* ── Theme toggle ── */
+  .theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1.5rem;
+    z-index: 1000;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg-surface);
+    color: var(--fg-muted);
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    line-height: 1;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .theme-toggle::after { content: var(--toggle-icon); }
+
+  .hero {
+    text-align: center;
+    padding: 4rem 0 2rem;
+    margin-bottom: 2rem;
+  }
+  .hero h1 { font-family: var(--font-mono); font-size: 2.4rem; font-weight: 700; color: var(--fg-bright); letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+  .hero h1 span { color: var(--accent); }
+  .hero .subtitle { font-family: var(--font-sans); color: var(--fg-muted); font-size: 0.92rem; max-width: 540px; margin: 0 auto; line-height: 1.6; }
+  .hero .meta { margin-top: 1.5rem; display: flex; justify-content: center; gap: 1.5rem; flex-wrap: wrap; }
+  .hero .meta span { font-size: 0.8rem; color: var(--fg-subtle); font-family: var(--font-mono); }
+  .hero .meta span a { color: var(--accent-dim); text-decoration: none; }
+  .hero .meta span a:hover { color: var(--accent); }
+
+  .toc { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem 2rem; margin-bottom: 3rem; transition: background 0.2s, border-color 0.2s; }
+  .toc h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-muted); margin-bottom: 1rem; border-bottom: none; padding-bottom: 0; }
+  .toc ol { list-style: none; counter-reset: toc; columns: 2; column-gap: 2rem; }
+  .toc li { counter-increment: toc; break-inside: avoid; margin-bottom: 0.35rem; }
+  .toc li::before { content: counter(toc, decimal-leading-zero) " "; color: var(--fg-subtle); font-family: var(--font-mono); font-size: 0.75rem; margin-right: 0.25rem; }
+  .toc a { font-family: var(--font-mono); color: var(--fg); text-decoration: none; font-size: 0.82rem; transition: color 0.15s; }
+  .toc a:hover { color: var(--accent); }
+
+  section { margin-bottom: 4rem; }
+  section + section { padding-top: 1rem; }
+
+  h2 { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 700; color: var(--fg-bright); letter-spacing: -0.01em; margin-bottom: 1.25rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-family: var(--font-mono); font-size: 1rem; font-weight: 600; color: var(--fg-bright); margin-top: 2rem; margin-bottom: 0.75rem; }
+  h4 { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; color: var(--accent); margin-top: 1.5rem; margin-bottom: 0.5rem; }
+
+  p { margin-bottom: 1rem; font-size: 0.95rem; line-height: 1.75; }
+  strong { color: var(--fg-bright); font-weight: 600; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; font-size: 0.93rem; line-height: 1.7; }
+  li { margin-bottom: 0.35rem; }
+  li::marker { color: var(--fg-subtle); }
+
+  .table-wrap { overflow-x: auto; margin-bottom: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 0.6rem 1rem; border-bottom: 1px solid var(--border-subtle); }
+  th { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); background: var(--bg-surface); border-bottom-color: var(--border); white-space: nowrap; }
+  td { font-family: var(--font-sans); font-size: 0.88rem; color: var(--fg); }
+  tr:hover td { background: var(--accent-glow); }
+  td code { background: var(--bg-elevated); padding: 0.15em 0.4em; border-radius: 3px; font-family: var(--font-mono); font-size: 0.82em; color: var(--blue-bright); }
+
+  pre { background: var(--bg-code); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; overflow-x: auto; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.65; color: var(--fg); transition: background 0.2s, border-color 0.2s; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  code { font-family: var(--font-mono); font-size: 0.85em; }
+  p code, li code { background: var(--bg-elevated); padding: 0.15em 0.4em; border-radius: 3px; color: var(--blue-bright); font-size: 0.85em; }
+
+  .kw { color: var(--blue-mid); } .str { color: var(--blue-light); } .cm { color: var(--fg-subtle); font-style: italic; } .num { color: var(--orange); } .key { color: var(--accent); } .fn { color: var(--blue-bright); }
+
+  .mermaid { margin: 2rem -10%; padding: 1.5rem 0; text-align: center; width: 120%; }
+  .mermaid svg { max-width: 100%; height: auto; }
+
+  .callout { font-family: var(--font-sans); background: var(--bg-surface); border-left: 3px solid var(--accent-dim); border-radius: 0 var(--radius) var(--radius) 0; padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.88rem; color: var(--fg-muted); line-height: 1.6; transition: background 0.2s, border-color 0.2s; }
+  .callout strong { font-family: var(--font-mono); color: var(--fg-bright); }
+  .callout.success { border-left-color: var(--accent-dim); }
+  .callout.warn { border-left-color: var(--orange); }
+
+  .badge { display: inline-block; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.2em 0.6em; border-radius: 3px; vertical-align: middle; margin-left: 0.4rem; }
+  .badge-done { background: var(--accent-dim); color: #fff; }
+  .badge-wip { background: var(--orange); color: #0b0e14; }
+  .badge-todo { background: var(--fg-subtle); color: var(--fg); }
+
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { padding-left: 1.5rem; position: relative; margin-bottom: 0.5rem; }
+  .checklist li::before { position: absolute; left: 0; font-family: var(--font-mono); font-size: 0.85rem; }
+  .checklist li.done { color: var(--fg-muted); }
+  .checklist li.done::before { content: "\2713"; color: var(--accent); }
+  .checklist li.todo::before { content: "\25CB"; color: var(--fg-subtle); }
+  .checklist li.wip::before { content: "\25D4"; color: var(--orange); }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .compare-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+  .compare-card h4 { margin-top: 0; font-size: 0.82rem; }
+  .compare-card.after { border-color: var(--accent-dim); }
+  .compare-card ul { font-family: var(--font-mono); padding-left: 1.25rem; font-size: 0.8rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+
+  @media (max-width: 640px) {
+    .container { padding: 2rem 1rem 4rem; }
+    .hero h1 { font-size: 1.6rem; }
+    .toc ol { columns: 1; }
+    .compare { grid-template-columns: 1fr; }
+    table { font-size: 0.8rem; }
+    th, td { padding: 0.4rem 0.6rem; }
+    .theme-toggle { top: 0.5rem; right: 0.75rem; }
+  }
+
+  .progress-bar { position: fixed; top: 0; left: 0; height: 2px; background: var(--accent); z-index: 999; transition: width 0.1s linear; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Emoji&display=swap" rel="stylesheet">
+<style>
+  @font-face {
+    font-family: 'Departure Mono';
+    src: url('https://cdn.jsdelivr.net/gh/rektdeckard/departure-mono@latest/fonts/DepartureMono-Regular.woff2') format('woff2');
+    font-weight: normal; font-style: normal; font-display: swap;
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progress"></div>
+<button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"></button>
+
+<div class="container">
+
+<!-- =============== HERO =============== -->
+<header class="hero">
+  <h1>cursor<span>-honcho</span></h1>
+  <p class="subtitle">Persistent memory for every Cursor session. Nine hooks intercept the agent lifecycle; Honcho accumulates identity across sessions, projects, and surfaces.</p>
+  <div class="meta">
+    <span><a href="https://github.com/plastic-labs/cursor-honcho">plastic-labs/cursor-honcho</a></span>
+    <span>TypeScript / Cursor Plugin</span>
+    <span>v0.1.0</span>
+    <span>February 2026</span>
+  </div>
+</header>
+
+<!-- =============== TOC =============== -->
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#data-flow">Data Flow &amp; Core Thesis</a></li>
+    <li><a href="#why">Why This Matters</a></li>
+    <li><a href="#hook-architecture">Hook Architecture</a></li>
+    <li><a href="#shared-memory">Shared Memory</a></li>
+    <li><a href="#peer-architecture">Peer Architecture</a></li>
+    <li><a href="#cache-system">Cache System</a></li>
+    <li><a href="#context-lifecycle">Context Lifecycle</a></li>
+    <li><a href="#mcp-server">MCP Server</a></li>
+    <li><a href="#cursor-exclusive">Cursor-Exclusive Features</a></li>
+    <li><a href="#configuration">Configuration</a></li>
+    <li><a href="#file-structure">File Structure</a></li>
+    <li><a href="#progress">Progress</a></li>
+    <li><a href="#demo">Demo: Session Lifecycle</a></li>
+    <li><a href="#api-surface">P.S. &mdash; API Surface</a></li>
+  </ol>
+</nav>
+
+<!-- =============== DATA FLOW =============== -->
+<section id="data-flow">
+  <h2>Data Flow &amp; Core Thesis</h2>
+
+  <p>Every prompt, tool call, reasoning trace, and response is a signal about what you're building and how you think. The plugin makes that signal legible to Honcho &mdash; and Honcho feeds back consolidated identity at the start of every session, before every prompt, and during context compaction. Everything runs as Bun subprocesses invoked by Cursor's hook system. No daemon, no polling &mdash; the agent lifecycle itself is the trigger.</p>
+
+  <div class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1f3150', 'primaryTextColor': '#c9d1d9', 'primaryBorderColor': '#3d6ea5', 'lineColor': '#3d6ea5', 'secondaryColor': '#162030', 'tertiaryColor': '#11151c', 'edgeLabelBackground': '#0b0e14', 'fontSize': '14px' }, 'flowchart': { 'nodeSpacing': 30, 'rankSpacing': 40 }}}%%
+flowchart LR
+    U["User Prompt"] -->|beforeSubmit| Q["Message Queue"]
+    Q --> H["Honcho API"]
+    H --> O["Observe + Dream"]
+    O --> C["Conclusions"]
+    C --> R["Represent"]
+    R -->|sessionStart| CTX["Context Injection"]
+    CTX --> A["Agent"]
+    A -->|stop / response| H
+    R <-->|MCP| D["Dialectic Chat"]
+
+    style U fill:#162030,stroke:#7eb8f6,color:#c9d1d9
+    style Q fill:#1f3150,stroke:#3d6ea5,color:#c9d1d9
+    style H fill:#11151c,stroke:#3d6ea5,color:#c9d1d9
+    style O fill:#11151c,stroke:#3d6ea5,color:#c9d1d9
+    style C fill:#11151c,stroke:#3d6ea5,color:#c9d1d9
+    style R fill:#11151c,stroke:#3d6ea5,color:#c9d1d9
+    style CTX fill:#1f3150,stroke:#7eb8f6,color:#c9d1d9
+    style A fill:#162030,stroke:#7eb8f6,color:#c9d1d9
+    style D fill:#1f3150,stroke:#3d6ea5,color:#c9d1d9
+  </div>
+
+  <h3>Agent &#x2192; Honcho</h3>
+  <ul>
+    <li><strong>Queue</strong> &mdash; every user prompt is appended to a local JSONL queue (~1&ndash;3ms) before async upload, ensuring zero message loss even if the API is slow</li>
+    <li><strong>Chunk</strong> &mdash; messages exceeding 24KB are split at newline/space boundaries with <code>[Part N/M]</code> prefixes</li>
+    <li><strong>Attribute</strong> &mdash; user messages carry the user peer ID; tool calls, reasoning, and responses carry the cursor peer ID</li>
+    <li><strong>Session</strong> &mdash; deterministic name <code>{peerName}-{basename(cwd)}</code>, shared with Claude Code for cross-surface convergence</li>
+  </ul>
+
+  <h3>Honcho &#x2192; Agent</h3>
+  <ul>
+    <li><strong>Context injection</strong> &mdash; at session start, user context (peer card + representation + conclusions) and cursor context (recent work + self-reflection) are fetched in parallel and injected as <code>additional_context</code></li>
+    <li><strong>Per-prompt context</strong> &mdash; topic-aware semantic search on each prompt, with TTL-based caching to avoid redundant API calls</li>
+    <li><strong>Memory anchor</strong> &mdash; before context compaction, all available Honcho context is injected as a structured document marked <code>(PRESERVE)</code></li>
+    <li><strong>MCP tools</strong> &mdash; on-demand <code>search</code>, <code>chat</code>, and <code>create_conclusion</code> for mid-conversation queries</li>
+  </ul>
+</section>
+
+<!-- =============== WHY IT MATTERS =============== -->
+<section id="why">
+  <h2>Why This Matters</h2>
+
+  <p>Every Cursor session starts from zero. The agent has no memory of your architecture decisions, your preferred patterns, what you were working on yesterday, or what you told it three sessions ago. Context compaction erases everything that doesn't fit in the summary. You repeat yourself. The agent re-discovers what it already knew.</p>
+
+  <p>Honcho changes this because it operates on a different timescale. It doesn't summarize and discard &mdash; it derives, consolidates, and builds a persistent representation that evolves as you work. The plugin hooks into nine lifecycle events to capture the full signal of a coding session: what you asked, what the agent built, how it reasoned, what tools it used, what subagents it spawned.</p>
+
+  <p>This means:</p>
+  <ul>
+    <li><strong>Sessions inherit context.</strong> The agent knows your preferences, your architecture, and your recent work before you say anything. No preamble needed.</li>
+    <li><strong>Understanding compounds.</strong> The 100th session benefits from the 99 before it. Conclusions consolidate through dreaming into an increasingly precise identity.</li>
+    <li><strong>Compaction is lossless.</strong> When Cursor truncates context, the memory anchor preserves everything Honcho knows. The agent loses conversation history but retains identity.</li>
+    <li><strong>Multiple surfaces converge.</strong> The same identity built from Cursor sessions also informs Claude Code, Obsidian, or any other Honcho-connected tool. Code in Cursor; the understanding follows you everywhere.</li>
+    <li><strong>You stay in control.</strong> Everything is opt-in. <code>HONCHO_ENABLED=false</code> disables the plugin. <code>HONCHO_SAVE_MESSAGES=false</code> stops message upload. No data leaves your machine without an API key.</li>
+  </ul>
+</section>
+
+<!-- =============== HOOK ARCHITECTURE =============== -->
+<section id="hook-architecture">
+  <h2>Hook Architecture</h2>
+
+  <p>Cursor exposes nine lifecycle hooks. Each fires as a subprocess, receives JSON on stdin, and returns JSON on stdout. The plugin registers a handler for every hook, each as a thin 3-line shim that imports and calls the real handler from <code>src/hooks/</code>.</p>
+
+  <div class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1f3150', 'primaryTextColor': '#c9d1d9', 'primaryBorderColor': '#3d6ea5', 'lineColor': '#3d6ea5', 'secondaryColor': '#162030', 'tertiaryColor': '#11151c', 'edgeLabelBackground': '#0b0e14', 'fontSize': '14px' }, 'flowchart': { 'nodeSpacing': 30, 'rankSpacing': 40 }}}%%
+flowchart TD
+    SS["sessionStart<br/>Load context"] --> BSP["beforeSubmitPrompt<br/>Save + retrieve"]
+    BSP --> PTU["postToolUse<br/>Log activity"]
+    PTU --> AAT["afterAgentThought<br/>Capture reasoning"]
+    AAT --> AAR["afterAgentResponse<br/>Capture response"]
+    AAR --> SAS["subagentStop<br/>Capture subagent"]
+    SAS --> PC["preCompact<br/>Memory anchor"]
+    PC --> ST["stop<br/>Final response"]
+    ST --> SE["sessionEnd<br/>Upload transcript"]
+
+    style SS fill:#162030,stroke:#7eb8f6,color:#c9d1d9
+    style BSP fill:#1f3150,stroke:#3d6ea5,color:#c9d1d9
+    style PTU fill:#11151c,stroke:#3d6ea5,color:#c9d1d9
+    style AAT fill:#11151c,stroke:#3d6ea5,color:#c9d1d9
+    style AAR fill:#11151c,stroke:#3d6ea5,color:#c9d1d9
+    style SAS fill:#11151c,stroke:#3d6ea5,color:#c9d1d9
+    style PC fill:#1f3150,stroke:#7eb8f6,color:#c9d1d9
+    style ST fill:#1f3150,stroke:#3d6ea5,color:#c9d1d9
+    style SE fill:#162030,stroke:#7eb8f6,color:#c9d1d9
+  </div>
+
+  <h3>Hook registry</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Hook</th><th>Timeout</th><th>Output Format</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>sessionStart</code></td><td>30s</td><td><code>{ additional_context, user_message }</code></td><td>Load identity + work context from Honcho, inject as system context</td></tr>
+        <tr><td><code>beforeSubmitPrompt</code></td><td>15s</td><td><code>{ continue, user_message }</code></td><td>Queue message locally, upload async, retrieve topic-aware context</td></tr>
+        <tr><td><code>postToolUse</code></td><td>10s</td><td><code>{}</code></td><td>Log significant tool activity (Write, Edit, Bash, Task) to Honcho</td></tr>
+        <tr><td><code>afterAgentThought</code></td><td>10s</td><td>&mdash;</td><td>Capture substantial reasoning traces (&gt;500 chars, &gt;3s)</td></tr>
+        <tr><td><code>afterAgentResponse</code></td><td>10s</td><td>&mdash;</td><td>Capture meaningful assistant responses (&ge;100 chars)</td></tr>
+        <tr><td><code>subagentStop</code></td><td>10s</td><td><code>{}</code></td><td>Capture completed subagent results and duration</td></tr>
+        <tr><td><code>preCompact</code></td><td>20s</td><td><code>{ user_message }</code></td><td>Inject full Honcho memory anchor before context compaction</td></tr>
+        <tr><td><code>stop</code></td><td>10s</td><td><code>{}</code></td><td>Upload last meaningful assistant response</td></tr>
+        <tr><td><code>sessionEnd</code></td><td>30s</td><td>&mdash;</td><td>Upload transcript, flush queue, generate self-summary</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Input format</h3>
+  <p>Every hook receives a <code>CursorHookInput</code> JSON object on stdin containing <code>conversation_id</code>, <code>session_id</code>, <code>workspace_roots[]</code>, and hook-specific fields. The working directory is extracted from <code>workspace_roots[0]</code>; the instance ID from <code>conversation_id</code>.</p>
+
+  <h3>Output conventions</h3>
+  <ul>
+    <li><code>additional_context</code> &mdash; injected as system-level context the agent sees but the user doesn't</li>
+    <li><code>user_message</code> &mdash; injected as a user-attributed message in the conversation</li>
+    <li><code>continue: true</code> &mdash; required by <code>beforeSubmitPrompt</code> to let the prompt proceed</li>
+    <li><code>{}</code> &mdash; hooks that observe without modifying (postToolUse, stop, subagentStop) output empty JSON</li>
+    <li><code>followup_message</code> &mdash; deliberately avoided in <code>stop</code> to prevent auto-loop behavior</li>
+  </ul>
+
+  <div class="callout success">
+    <strong>Tool matcher.</strong> <code>postToolUse</code> registers a matcher pattern (<code>Write|Edit|Shell|Task|MCP</code>) so it only fires for significant tool calls, skipping reads and searches entirely.
+  </div>
+</section>
+
+<!-- =============== SHARED MEMORY =============== -->
+<section id="shared-memory">
+  <h2>Shared Memory</h2>
+
+  <p>The plugin shares its Honcho workspace and local cache with <a href="https://github.com/plastic-labs/claude-honcho">claude-honcho</a> (the Claude Code plugin). Both tools write to the same <code>claude_code</code> workspace by default, use the same <code>~/.honcho/</code> cache directory, and target the same user peer. Only the AI peer differs.</p>
+
+  <div class="compare">
+    <div class="compare-card">
+      <h4>Claude Code</h4>
+      <ul>
+        <li>AI peer: <code>claude</code></li>
+        <li>Settings: <code>~/.claude/settings.json</code></li>
+        <li>Hooks: <code>hooks/</code> in settings</li>
+        <li>6 hook events</li>
+        <li>Output: <code>{ result }</code> wrapper</li>
+      </ul>
+    </div>
+    <div class="compare-card after">
+      <h4>Cursor</h4>
+      <ul>
+        <li>AI peer: <code>cursor</code></li>
+        <li>Settings: <code>~/.cursor/hooks.json</code></li>
+        <li>Hooks: <code>.cursor-plugin/</code> manifests</li>
+        <li>9 hook events</li>
+        <li>Output: direct JSON</li>
+      </ul>
+    </div>
+  </div>
+
+  <p>When both plugins are active, the session accumulates messages from both surfaces. Honcho's observation pipeline sees the combined signal &mdash; your Claude Code conversations and your Cursor sessions contribute to the same identity. Conclusions derived from one surface inform context on the other.</p>
+
+  <div class="callout success">
+    <strong>Convergence by default.</strong> No configuration needed. Both plugins target <code>claude_code</code> workspace and share <code>~/.honcho/cache.json</code>, <code>context-cache.json</code>, <code>message-queue.jsonl</code>, and <code>claude-context.md</code>. Install both and they converge automatically.
+  </div>
+</section>
+
+<!-- =============== PEER ARCHITECTURE =============== -->
+<section id="peer-architecture">
+  <h2>Peer Architecture</h2>
+  <p>Honcho uses an observer/observed model. The <strong>observed</strong> peer is the user whose identity is being built. The <strong>observer</strong> is the AI whose responses and behavior are tracked. Each hook handler resolves both peers at session start and configures observation flags.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Role</th><th>Peer</th><th>Flags</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Observed (user)</td><td><code>$USER</code> or <code>HONCHO_PEER_NAME</code></td><td><code>observe_me: true</code></td><td>The person &mdash; whose identity Honcho builds from prompts and project signals</td></tr>
+        <tr><td>Observer (AI)</td><td><code>cursor</code> or <code>HONCHO_CURSOR_PEER</code></td><td><code>observe_others: true</code></td><td>The agent &mdash; whose responses, tool use, and reasoning are tracked</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>User messages (prompts) are attributed to the user peer. Everything else &mdash; tool activity, reasoning traces, responses, subagent results &mdash; is attributed to the cursor peer. This separation lets Honcho build two distinct context views: what the user cares about, and what the AI has been doing.</p>
+
+  <p>Peer configuration is set via fire-and-forget calls during <code>sessionStart</code>. Both <code>honcho.peer()</code> and <code>honcho.session()</code> are idempotent &mdash; calling them with an existing name returns the existing resource.</p>
+</section>
+
+<!-- =============== CACHE SYSTEM =============== -->
+<section id="cache-system">
+  <h2>Cache System</h2>
+  <p>Five cache layers at <code>~/.honcho/</code> provide local-first reliability and reduce API calls. Every cache is JSON or JSONL, human-readable, and shared between Claude Code and Cursor.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Layer</th><th>File</th><th>Purpose</th><th>Eviction</th></tr></thead>
+      <tbody>
+        <tr><td>ID Cache</td><td><code>cache.json</code></td><td>Workspace name&#x2192;ID, peer name&#x2192;ID, session cwd&#x2192;ID mappings</td><td>Manual or <code>clearAllCaches()</code></td></tr>
+        <tr><td>Context Cache</td><td><code>context-cache.json</code></td><td>User context, cursor context, summaries with TTL</td><td>TTL (default 300s) or message threshold (default 30)</td></tr>
+        <tr><td>Message Queue</td><td><code>message-queue.jsonl</code></td><td>Append-only buffer of unsent messages; fields: content, peerId, cwd, timestamp</td><td>Marked <code>uploaded</code> after successful API call</td></tr>
+        <tr><td>Work Log</td><td><code>claude-context.md</code></td><td>Activity log: tool calls, file writes, subagent results, session summaries</td><td>Max entries (default 50)</td></tr>
+        <tr><td>Git State</td><td><code>git-state.json</code></td><td>Per-cwd: branch, commit, message, dirty files, timestamp</td><td>Overwritten per session start</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Context cache TTL</h3>
+  <p>The context cache uses two eviction strategies: time-based (default 300s) and message-count-based (default 30 messages). Whichever triggers first causes a fresh fetch from Honcho. The message threshold enables knowledge graph refresh &mdash; after enough new messages, the representation may have evolved.</p>
+
+  <h3>Message queue reliability</h3>
+  <p><code>beforeSubmitPrompt</code> writes to the local JSONL queue in ~1&ndash;3ms, then starts an async upload. If the API is slow or fails, the message is still queued. <code>sessionEnd</code> flushes any remaining queued messages, filtered by working directory to avoid cross-project contamination.</p>
+</section>
+
+<!-- =============== CONTEXT LIFECYCLE =============== -->
+<section id="context-lifecycle">
+  <h2>Context Lifecycle</h2>
+  <p>Context flows through three distinct phases, each targeting a different moment in the agent's lifecycle.</p>
+
+  <h3>Phase 1: Session start</h3>
+  <p>The most expensive phase. Five parallel API calls fetch the full context picture:</p>
+  <ol>
+    <li><code>userPeer.context()</code> &mdash; peer card, representation, up to 25 conclusions</li>
+    <li><code>cursorPeer.context()</code> &mdash; cursor's recent work context, up to 15 conclusions</li>
+    <li><code>session.summaries()</code> &mdash; previous session summaries</li>
+    <li><code>userPeer.chat()</code> &mdash; dialectic summary of the user's profile</li>
+    <li><code>cursorPeer.chat()</code> &mdash; dialectic summary of cursor's recent work</li>
+  </ol>
+  <p>Results are assembled into a structured markdown document injected as <code>additional_context</code>. Git state is captured and compared to previous session state &mdash; branch switches and new commits are uploaded as user messages. Pixel art is rendered to TTY.</p>
+
+  <h3>Phase 2: Per-prompt</h3>
+  <p><code>beforeSubmitPrompt</code> runs on every user message. It extracts topics (file paths, quoted strings, tech terms, error patterns) and checks the context cache. If fresh and below the message threshold, cached context is returned instantly. Otherwise, a topic-aware semantic search fetches fresh context from Honcho. Trivial prompts (yes/no/ok/slash commands) skip context retrieval entirely.</p>
+
+  <h3>Phase 3: Pre-compaction</h3>
+  <p>When Cursor is about to truncate context, <code>preCompact</code> fires. This is the "last chance" hook &mdash; it fetches everything available from Honcho (with higher limits than session start) and injects a structured <strong>HONCHO MEMORY ANCHOR</strong> with sections marked <code>(PRESERVE)</code>. The anchor becomes part of the compaction summary, ensuring identity survives truncation.</p>
+
+  <div class="callout success">
+    <strong>Lossless compaction.</strong> The memory anchor includes: session identity, user profile (peer card), key conclusions, cursor's recent work, session summaries, and dialectic understanding. Even after aggressive context truncation, the agent retains a complete identity picture.
+  </div>
+</section>
+
+<!-- =============== MCP SERVER =============== -->
+<section id="mcp-server">
+  <h2>MCP Server</h2>
+  <p>A Model Context Protocol server exposes three on-demand tools the agent can call mid-conversation. The server runs as a Bun subprocess defined in <code>.mcp.json</code>.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tool</th><th>Input</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>search</code></td><td><code>query</code>, <code>limit?</code></td><td>Semantic search across session messages. Returns content, peer attribution, timestamps</td></tr>
+        <tr><td><code>chat</code></td><td><code>query</code></td><td>Dialectic reasoning about the user. Grounded in conclusions + representation. Medium reasoning level</td></tr>
+        <tr><td><code>create_conclusion</code></td><td><code>content</code></td><td>Save a key insight or biographical detail. Persists as a conclusion in the session</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The MCP server uses <code>CURSOR_PROJECT_DIR</code> (Cursor's env var) to determine the session name. It shares the same config loading and Honcho client initialization as the hooks.</p>
+</section>
+
+<!-- =============== CURSOR-EXCLUSIVE =============== -->
+<section id="cursor-exclusive">
+  <h2>Cursor-Exclusive Features</h2>
+  <p>Cursor's plugin system supports declarative Markdown components that Claude Code doesn't have: custom subagents, slash commands, and always-applied rules. The plugin leverages all three.</p>
+
+  <h3>Three exclusive hooks</h3>
+  <p>Cursor exposes three hook events that Claude Code lacks:</p>
+  <ul>
+    <li><code>subagentStop</code> &mdash; fires when a spawned subagent completes. The handler captures the agent type, duration, and result (truncated to 500 chars), uploading it as a cursor peer message</li>
+    <li><code>afterAgentThought</code> &mdash; fires after deep reasoning. Only captures substantial traces (&gt;500 chars AND &gt;3 seconds), filtering out trivial internal reasoning</li>
+    <li><code>afterAgentResponse</code> &mdash; fires after the agent produces a response. Filters for meaningful content (&ge;100 chars, not tool announcements)</li>
+  </ul>
+
+  <h3>Memory analyst subagent</h3>
+  <p>A read-only subagent (<code>agents/memory-analyst.md</code>) specialized in deep Honcho queries. Uses the <code>fast</code> model. Given a complex question about user history or preferences, it breaks it into 2&ndash;3 sub-queries, combines results from <code>search</code> and <code>chat</code> MCP tools, and reports with confidence levels and evidence gaps.</p>
+
+  <h3>Slash commands</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Command</th><th>MCP Tool</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>/recall [topic]</code></td><td><code>search</code></td><td>Quick memory search &mdash; find past interactions by topic, summarize with timestamps and session context</td></tr>
+        <tr><td><code>/remember [fact]</code></td><td><code>create_conclusion</code></td><td>Save to memory &mdash; persist an insight or preference as a Honcho conclusion</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Always-on memory rule</h3>
+  <p><code>rules/honcho-memory.md</code> is applied to every conversation. It instructs the agent to: trust injected Honcho context, use MCP tools for deeper queries mid-conversation, save new insights via <code>create_conclusion</code>, check memory before asking preference questions, and delegate complex memory queries to the <code>memory-analyst</code> subagent.</p>
+</section>
+
+<!-- =============== CONFIGURATION =============== -->
+<section id="configuration">
+  <h2>Configuration</h2>
+
+  <h3>Environment variables</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>HONCHO_API_KEY</code></td><td>Yes</td><td>&mdash;</td><td>Honcho API key</td></tr>
+        <tr><td><code>HONCHO_PEER_NAME</code></td><td>No</td><td><code>$USER</code></td><td>User peer name (the observed identity)</td></tr>
+        <tr><td><code>HONCHO_WORKSPACE</code></td><td>No</td><td><code>claude_code</code></td><td>Workspace name (shared with Claude Code)</td></tr>
+        <tr><td><code>HONCHO_CURSOR_PEER</code></td><td>No</td><td><code>cursor</code></td><td>AI peer name. Fallback: <code>HONCHO_CLAUDE_PEER</code></td></tr>
+        <tr><td><code>HONCHO_ENDPOINT</code></td><td>No</td><td>production</td><td><code>local</code> for localhost:8000, or a full URL</td></tr>
+        <tr><td><code>HONCHO_SAVE_MESSAGES</code></td><td>No</td><td><code>true</code></td><td>Upload messages to Honcho. <code>false</code> disables</td></tr>
+        <tr><td><code>HONCHO_ENABLED</code></td><td>No</td><td><code>true</code></td><td>Master kill switch. <code>false</code> disables all hooks</td></tr>
+        <tr><td><code>HONCHO_LOGGING</code></td><td>No</td><td><code>true</code></td><td>Structured activity logging</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Config file</h3>
+  <p><code>~/.honcho/config.json</code> persists settings across sessions. Environment variables override file values. The file is created by <code>saveConfig()</code> and read by <code>loadConfig()</code>, which merges file + env.</p>
+
+  <h3>Tuning parameters</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>contextRefresh.ttlSeconds</code></td><td><code>300</code></td><td>Context cache lifetime before forced refresh</td></tr>
+        <tr><td><code>contextRefresh.messageThreshold</code></td><td><code>30</code></td><td>Messages before knowledge graph refresh</td></tr>
+        <tr><td><code>contextRefresh.skipDialectic</code></td><td><code>false</code></td><td>Skip dialectic chat calls (faster but less nuanced)</td></tr>
+        <tr><td><code>localContext.maxEntries</code></td><td><code>50</code></td><td>Max entries in <code>claude-context.md</code> work log</td></tr>
+        <tr><td><code>messageUpload.summarizeAssistant</code></td><td><code>false</code></td><td>Summarize assistant messages before upload</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>API endpoints</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Environment</th><th>Base URL</th></tr></thead>
+      <tbody>
+        <tr><td>Production</td><td><code>https://api.honcho.dev/v3</code></td></tr>
+        <tr><td>Local</td><td><code>http://localhost:8000/v3</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- =============== FILE STRUCTURE =============== -->
+<section id="file-structure">
+  <h2>File Structure</h2>
+  <pre><code>plugins/honcho/
+&#x251C;&#x2500;&#x2500; .cursor-plugin/
+&#x2502;   &#x2514;&#x2500;&#x2500; plugin.json            <span class="cm"># Plugin manifest: skills, agents, commands, rules paths</span>
+&#x251C;&#x2500;&#x2500; .mcp.json                  <span class="cm"># MCP server config (bun run mcp-server.ts)</span>
+&#x251C;&#x2500;&#x2500; mcp-server.ts              <span class="cm"># 5-line entrypoint</span>
+&#x251C;&#x2500;&#x2500; hooks/
+&#x2502;   &#x251C;&#x2500;&#x2500; hooks.json             <span class="cm"># 9 hook event registrations with timeouts + matchers</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; session-start.ts       <span class="cm"># Shim &#x2192; src/hooks/session-start.ts</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; session-end.ts         <span class="cm"># Shim &#x2192; src/hooks/session-end.ts</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; before-submit-prompt.ts
+&#x2502;   &#x251C;&#x2500;&#x2500; post-tool-use.ts
+&#x2502;   &#x251C;&#x2500;&#x2500; pre-compact.ts
+&#x2502;   &#x251C;&#x2500;&#x2500; stop.ts
+&#x2502;   &#x251C;&#x2500;&#x2500; subagent-stop.ts
+&#x2502;   &#x251C;&#x2500;&#x2500; after-agent-thought.ts
+&#x2502;   &#x2514;&#x2500;&#x2500; after-agent-response.ts
+&#x251C;&#x2500;&#x2500; src/
+&#x2502;   &#x251C;&#x2500;&#x2500; config.ts              <span class="cm"># HonchoCursorConfig, env var loading, session naming</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; cache.ts               <span class="cm"># 5 cache layers, message queue, git state, chunking</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; git.ts                 <span class="cm"># Git state capture, change detection, feature inference</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; log.ts                 <span class="cm"># Structured logging (hook, api, cache, flow, async, error)</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; visual.ts              <span class="cm"># Stderr output for TTY, verbose file logging</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; install.ts             <span class="cm"># Checks ~/.cursor/hooks.json for installation</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; pixel.ts               <span class="cm"># Honcho pixel art character</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; spinner.ts             <span class="cm"># Animated spinners (wave, neural, braille, moon)</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; styles.ts              <span class="cm"># ANSI colors: orange-to-pale-blue gradient</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; unicode.ts             <span class="cm"># Runtime Unicode generation (blocks, circles, arrows, box)</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; hooks/
+&#x2502;   &#x2502;   &#x251C;&#x2500;&#x2500; session-start.ts   <span class="cm"># 330 lines &mdash; parallel context fetch, git state, pixel art</span>
+&#x2502;   &#x2502;   &#x251C;&#x2500;&#x2500; session-end.ts     <span class="cm"># 351 lines &mdash; transcript parse, upload, self-summary</span>
+&#x2502;   &#x2502;   &#x251C;&#x2500;&#x2500; before-submit-prompt.ts <span class="cm"># 296 lines &mdash; topic extraction, TTL cache</span>
+&#x2502;   &#x2502;   &#x251C;&#x2500;&#x2500; post-tool-use.ts   <span class="cm"># 270 lines &mdash; semantic tool analysis, rich summaries</span>
+&#x2502;   &#x2502;   &#x251C;&#x2500;&#x2500; pre-compact.ts     <span class="cm"># 242 lines &mdash; memory anchor with (PRESERVE) sections</span>
+&#x2502;   &#x2502;   &#x251C;&#x2500;&#x2500; stop.ts            <span class="cm"># 175 lines &mdash; last response capture</span>
+&#x2502;   &#x2502;   &#x251C;&#x2500;&#x2500; subagent-stop.ts   <span class="cm"># 89 lines &mdash; subagent result capture</span>
+&#x2502;   &#x2502;   &#x251C;&#x2500;&#x2500; after-agent-thought.ts <span class="cm"># 73 lines &mdash; reasoning trace capture</span>
+&#x2502;   &#x2502;   &#x2514;&#x2500;&#x2500; after-agent-response.ts <span class="cm"># 80 lines &mdash; response capture</span>
+&#x2502;   &#x251C;&#x2500;&#x2500; mcp/
+&#x2502;   &#x2502;   &#x2514;&#x2500;&#x2500; server.ts          <span class="cm"># 3 tools: search, chat, create_conclusion</span>
+&#x2502;   &#x2514;&#x2500;&#x2500; skills/
+&#x2502;       &#x2514;&#x2500;&#x2500; status-runner.ts   <span class="cm"># CLI status display</span>
+&#x251C;&#x2500;&#x2500; skills/
+&#x2502;   &#x251C;&#x2500;&#x2500; interview/SKILL.md     <span class="cm"># 8-question user interview</span>
+&#x2502;   &#x2514;&#x2500;&#x2500; status/SKILL.md        <span class="cm"># Memory system status display</span>
+&#x251C;&#x2500;&#x2500; agents/
+&#x2502;   &#x2514;&#x2500;&#x2500; memory-analyst.md      <span class="cm"># Read-only deep query subagent</span>
+&#x251C;&#x2500;&#x2500; commands/
+&#x2502;   &#x251C;&#x2500;&#x2500; recall.md              <span class="cm"># /recall &mdash; quick memory search</span>
+&#x2502;   &#x2514;&#x2500;&#x2500; remember.md            <span class="cm"># /remember &mdash; save to memory</span>
+&#x2514;&#x2500;&#x2500; rules/
+    &#x2514;&#x2500;&#x2500; honcho-memory.md       <span class="cm"># Always-applied memory behavior rule</span>
+
+plugins/honcho-dev/
+&#x251C;&#x2500;&#x2500; .cursor-plugin/plugin.json
+&#x2514;&#x2500;&#x2500; skills/
+    &#x251C;&#x2500;&#x2500; integrate/SKILL.md     <span class="cm"># Honcho SDK integration guide</span>
+    &#x251C;&#x2500;&#x2500; migrate-py/SKILL.md    <span class="cm"># Python SDK v1.6 &#x2192; v2.0 migration</span>
+    &#x2514;&#x2500;&#x2500; migrate-ts/SKILL.md    <span class="cm"># TypeScript SDK v1.6 &#x2192; v2.0 migration</span></code></pre>
+</section>
+
+<!-- =============== PROGRESS =============== -->
+<section id="progress">
+  <h2>Progress</h2>
+  <ul class="checklist">
+    <li class="done">Config system: env vars, file persistence, Cursor-specific peer naming</li>
+    <li class="done">5-layer cache: ID, context (TTL), message queue (JSONL), work log, git state</li>
+    <li class="done">Session start: parallel 5-source context fetch, git state capture, pixel art</li>
+    <li class="done">Before submit: topic extraction, TTL-based caching, async upload, skip patterns</li>
+    <li class="done">Post tool use: semantic tool analysis, rich summaries for Write/Edit/Bash/Task</li>
+    <li class="done">Pre-compact: full memory anchor with (PRESERVE) sections</li>
+    <li class="done">Stop: last response capture without auto-loop</li>
+    <li class="done">Session end: transcript parsing, queue flush, assistant message extraction, self-summary</li>
+    <li class="done">3 Cursor-exclusive hooks: subagentStop, afterAgentThought, afterAgentResponse</li>
+    <li class="done">MCP server: search, chat, create_conclusion tools</li>
+    <li class="done">Memory analyst subagent</li>
+    <li class="done">/recall and /remember slash commands</li>
+    <li class="done">Always-on memory rule</li>
+    <li class="done">Shared memory with Claude Code (same workspace, cache directory, user peer)</li>
+    <li class="done">Interview and status skills</li>
+    <li class="done">honcho-dev plugin: integrate, migrate-py, migrate-ts skills</li>
+    <li class="todo">Integration testing against live Cursor sessions</li>
+    <li class="todo">Marketplace publication</li>
+    <li class="todo">Visual status indicator in Cursor UI</li>
+  </ul>
+</section>
+
+<!-- =============== DEMO WALKTHROUGH =============== -->
+<section id="demo">
+  <h2>Demo: Session Lifecycle</h2>
+  <p>End-to-end walkthrough of a single Cursor session with Honcho active.</p>
+
+  <h3>1. Session starts</h3>
+  <p><code>sessionStart</code> fires. The handler captures git state (<code>main @ a3912b1</code>, clean), resolves the session (<code>eri-cursor-honcho</code>), and launches 5 parallel API calls. Within the 30s timeout, it injects:</p>
+  <pre><code><span class="cm">## Honcho Memory System Active</span>
+- User: eri
+- AI: cursor
+- Workspace: claude_code
+- Session: cursor-honcho
+
+<span class="cm">## eri's Profile</span>
+<span class="str">Unified quality-assurance personality...</span>
+
+<span class="cm">## AI Self-Reflection</span>
+<span class="str">Recent activities focused on building the cursor-honcho plugin...</span>
+
+<span class="cm">## Session Summary</span>
+<span class="str">Eri requested creation of a Cursor plugin named "honcho"...</span></code></pre>
+
+  <h3>2. User sends a prompt</h3>
+  <p><code>beforeSubmitPrompt</code> receives: <em>"can you add error handling to the cache layer?"</em></p>
+  <ol>
+    <li>Message queued to <code>~/.honcho/message-queue.jsonl</code> (~2ms)</li>
+    <li>Async upload starts immediately</li>
+    <li>Topics extracted: <code>["error", "handling", "cache", "layer"]</code></li>
+    <li>Context cache is stale (TTL expired) &mdash; fresh fetch with search query <code>"error handling cache layer"</code></li>
+    <li>Results injected as <code>user_message</code> with relevant conclusions</li>
+  </ol>
+
+  <h3>3. Agent works</h3>
+  <p><code>postToolUse</code> fires for each significant tool call:</p>
+  <pre><code><span class="cm"># Write to cache.ts detected:</span>
+[Tool] Wrote cache.ts (<span class="kw">defines</span> <span class="fn">handleCacheError</span>, <span class="num">45</span> lines)
+
+<span class="cm"># Edit to config.ts detected:</span>
+[Tool] Edited config.ts (+<span class="num">12</span>/-<span class="num">3</span> tokens, line <span class="num">156</span>)
+
+<span class="cm"># Subagent spawned and completed:</span>
+[Subagent general-purpose](<span class="num">4.2</span>s) Found 3 error patterns in existing code</code></pre>
+
+  <h3>4. Context fills up</h3>
+  <p><code>preCompact</code> fires at 85% context usage. It fetches all available context from Honcho and injects a memory anchor:</p>
+  <pre><code><span class="cm"># === HONCHO MEMORY ANCHOR (PRESERVE) ===</span>
+
+<span class="cm">## Session Identity (PRESERVE)</span>
+User: eri | AI: cursor | Session: cursor-honcho
+
+<span class="cm">## User's Profile (PRESERVE)</span>
+<span class="str">Pragmatic perfectionism with unified quality-assurance...</span>
+
+<span class="cm">## Key Conclusions About User (PRESERVE)</span>
+<span class="str">- Treats precision failures as system validation signals</span>
+<span class="str">- Applies essentialism recursively across all domains</span>
+
+<span class="cm">## Cursor's Recent Work (PRESERVE)</span>
+<span class="str">Added error handling to cache.ts, modified config.ts...</span></code></pre>
+
+  <h3>5. Session ends</h3>
+  <p><code>sessionEnd</code> parses the transcript JSONL, extracts up to 40 assistant messages (prioritizing explanatory content over tool announcements), uploads them with cursor peer attribution, generates a self-summary, and writes it to <code>claude-context.md</code>.</p>
+</section>
+
+<!-- =============== PS: API =============== -->
+<section id="api-surface" style="margin-top: 6rem; padding-top: 3rem; border-top: 1px solid var(--border);">
+  <h2 style="color: var(--fg-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.12em; border-bottom: none; padding-bottom: 0; margin-bottom: 0.5rem;">P.S.</h2>
+  <h2>API Surface</h2>
+
+  <h3>Currently used</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Capability</th><th>Used by</th></tr></thead>
+      <tbody>
+        <tr><td><code>honcho.session(name)</code></td><td>Every hook &mdash; session resolution by name</td></tr>
+        <tr><td><code>honcho.peer(name)</code></td><td>Every hook &mdash; user peer + cursor peer resolution</td></tr>
+        <tr><td><code>session.setPeerConfiguration()</code></td><td>sessionStart &mdash; observation flags</td></tr>
+        <tr><td><code>peer.context()</code></td><td>sessionStart, preCompact &mdash; card + representation + conclusions</td></tr>
+        <tr><td><code>session.context()</code></td><td>beforeSubmitPrompt &mdash; topic-aware semantic search</td></tr>
+        <tr><td><code>peer.chat()</code></td><td>sessionStart, preCompact &mdash; dialectic summary</td></tr>
+        <tr><td><code>session.addMessages()</code></td><td>sessionEnd, stop, subagentStop, afterAgent* &mdash; message upload</td></tr>
+        <tr><td><code>session.summaries()</code></td><td>sessionStart, preCompact &mdash; previous session summaries</td></tr>
+        <tr><td><code>session.search()</code></td><td>MCP search tool &mdash; semantic search across messages</td></tr>
+        <tr><td><code>peer.conclusions.create()</code></td><td>MCP create_conclusion tool &mdash; save insights</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Proposals</h3>
+  <p>The hook-to-identity pipeline works through conversational primitives. These would make it native.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Proposal</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Bulk message ingestion endpoint</td><td>Session end uploads 40+ messages in serial <code>addMessages</code> calls. One batch endpoint would cut latency by 10x</td></tr>
+        <tr><td>Streaming context SSE</td><td>Context injection at session start could stream incrementally instead of blocking on 5 parallel calls</td></tr>
+        <tr><td>Cross-session conclusion dedup</td><td>Cursor and Claude Code sessions may derive duplicate conclusions from overlapping signals</td></tr>
+        <tr><td>Lightweight context ping</td><td>A fast "has anything changed?" check would let beforeSubmitPrompt skip fetches when the representation hasn't evolved</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div><!-- .container -->
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: 'loose',
+    fontFamily: 'Departure Mono, Noto Emoji, monospace',
+    fontSize: 16,
+    flowchart: { padding: 20, nodeSpacing: 50, rankSpacing: 60, useMaxWidth: true },
+  });
+</script>
+
+<script>
+  // Theme toggle with localStorage persistence
+  (function() {
+    const toggle = document.getElementById('theme-toggle');
+    const stored = localStorage.getItem('arch-theme');
+    if (stored) document.documentElement.setAttribute('data-theme', stored);
+
+    toggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('arch-theme', next);
+    });
+  })();
+
+  window.addEventListener('scroll', () => {
+    const bar = document.getElementById('progress');
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = (max > 0 ? (window.scrollY / max) * 100 : 0) + '%';
+  });
+</script>
+
+</body>
+</html>
