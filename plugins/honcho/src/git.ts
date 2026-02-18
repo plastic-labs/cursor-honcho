@@ -1,8 +1,8 @@
 /**
  * Git State Utilities
  *
- * Captures git state from the filesystem without requiring Claude to run git commands.
- * Used to detect external changes (branch switches, commits) between Claude sessions.
+ * Captures git state from the filesystem without requiring the AI to run git commands.
+ * Used to detect external changes (branch switches, commits) between sessions.
  */
 
 import { execSync } from "child_process";

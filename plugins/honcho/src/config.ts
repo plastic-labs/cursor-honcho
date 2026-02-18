@@ -84,7 +84,7 @@ export function loadConfigFromEnv(): HonchoCursorConfig | null {
   }
 
   const peerName = process.env.HONCHO_PEER_NAME || process.env.USER || "user";
-  const workspace = process.env.HONCHO_WORKSPACE || "claude_code";
+  const workspace = process.env.HONCHO_WORKSPACE || "cursor";
   const cursorPeer = process.env.HONCHO_CURSOR_PEER || process.env.HONCHO_CLAUDE_PEER || "cursor";
   const endpoint = process.env.HONCHO_ENDPOINT;
 

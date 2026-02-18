@@ -1,6 +1,5 @@
 /**
  * Honcho pixel art character for terminal display
- * Designed to stack nicely with Claude Code's mascot (3 rows)
  */
 
 import { openSync, writeSync, closeSync } from "fs";
@@ -265,7 +264,7 @@ export function supportsUnicode(): boolean {
 }
 
 /**
- * Display honcho with optional label (like Claude's startup)
+ * Display honcho with optional label
  * Always uses Unicode - relies on TTY output for proper rendering
  */
 export function displayHonchoStartup(label?: string, subtitle?: string, extra?: string): string {
@@ -276,7 +275,7 @@ export function displayHonchoStartup(label?: string, subtitle?: string, extra?: 
   // Pad all art lines to a consistent visible width so right-hand text aligns cleanly.
   const maxWidth = Math.max(...lines.map(visibleWidth));
 
-  // Format with label to the right (like Claude Code does)
+  // Format with label to the right of the pixel art
   const output = lines.map((line, i) => {
     const pad = " ".repeat(Math.max(0, maxWidth - visibleWidth(line)));
     const padded = `${line}${pad}`;
@@ -291,14 +290,13 @@ export function displayHonchoStartup(label?: string, subtitle?: string, extra?: 
 
 /**
  * Display honcho startup with direct TTY output
- * This ensures Unicode renders properly like Claude Code
+ * This ensures Unicode renders properly in the terminal
  */
 export function displayHonchoStartupTTY(label?: string, subtitle?: string, extra?: string): void {
   writeTTY(displayHonchoStartup(label, subtitle, extra) + "\n");
 }
 
 /**
- * Stack Honcho above Claude's display area
  * Returns the pixel art lines for integration
  * Always returns Unicode - use TTY output for proper rendering
  */
@@ -308,7 +306,7 @@ export function getHonchoLines(): string[] {
 
 /**
  * Preview all variants (for testing)
- * Uses direct TTY output like Claude Code does
+ * Uses direct TTY output
  */
 export function previewAll(): void {
   // Switch terminal to UTF-8 mode first, then output

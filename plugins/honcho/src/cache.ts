@@ -7,7 +7,7 @@ const CACHE_DIR = join(homedir(), ".honcho");
 const ID_CACHE_FILE = join(CACHE_DIR, "cache.json");
 const CONTEXT_CACHE_FILE = join(CACHE_DIR, "context-cache.json");
 const MESSAGE_QUEUE_FILE = join(CACHE_DIR, "message-queue.jsonl");
-const CLAUDE_CONTEXT_FILE = join(CACHE_DIR, "claude-context.md");
+const WORK_CONTEXT_FILE = join(CACHE_DIR, "work-context.md");
 
 // Ensure cache directory exists
 function ensureCacheDir(): void {
@@ -24,7 +24,7 @@ interface IdCache {
   workspace?: { name: string; id: string };
   peers?: Record<string, string>; // peerName -> peerId
   sessions?: Record<string, { name: string; id: string; updatedAt: string }>; // cwd -> session info
-  claudeInstanceId?: string; // Current Claude Code session_id for instance tagging
+  instanceId?: string; // Current session_id for instance tagging
 }
 
 export function loadIdCache(): IdCache {
@@ -82,25 +82,25 @@ export function setCachedSessionId(cwd: string, name: string, id: string): void 
   saveIdCache(cache);
 }
 
-// Claude instance tracking for parallel session support
-export function getClaudeInstanceId(): string | null {
+// Instance tracking for parallel session support
+export function getInstanceId(): string | null {
   const cache = loadIdCache();
-  return cache.claudeInstanceId || null;
+  return cache.instanceId || null;
 }
 
-export function setClaudeInstanceId(instanceId: string): void {
+export function setInstanceId(id: string): void {
   const cache = loadIdCache();
-  cache.claudeInstanceId = instanceId;
+  cache.instanceId = id;
   saveIdCache(cache);
 }
 
 // ============================================
-// Context Cache - user + claude context with TTL
+// Context Cache - user + AI context with TTL
 // ============================================
 
 interface ContextCache {
   userContext?: { data: any; fetchedAt: number };
-  claudeContext?: { data: any; fetchedAt: number };
+  aiContext?: { data: any; fetchedAt: number };
   summaries?: { data: any; fetchedAt: number };
   messageCount?: number; // Track messages since last refresh
   lastRefreshMessageCount?: number; // Message count at last knowledge graph refresh
@@ -148,17 +148,17 @@ export function setCachedUserContext(data: any): void {
   saveContextCache(cache);
 }
 
-export function getCachedClaudeContext(): any | null {
+export function getCachedAIContext(): any | null {
   const cache = loadContextCache();
-  if (cache.claudeContext && Date.now() - cache.claudeContext.fetchedAt < getContextTTL()) {
-    return cache.claudeContext.data;
+  if (cache.aiContext && Date.now() - cache.aiContext.fetchedAt < getContextTTL()) {
+    return cache.aiContext.data;
   }
   return null;
 }
 
-export function setCachedClaudeContext(data: any): void {
+export function setCachedAIContext(data: any): void {
   const cache = loadContextCache();
-  cache.claudeContext = { data, fetchedAt: Date.now() };
+  cache.aiContext = { data, fetchedAt: Date.now() };
   saveContextCache(cache);
 }
 
@@ -208,7 +208,7 @@ interface QueuedMessage {
   cwd: string;
   timestamp: string;
   uploaded?: boolean;
-  instanceId?: string; // Claude Code instance for parallel session support
+  instanceId?: string; // Session instance for parallel session support
 }
 
 export function queueMessage(content: string, peerId: string, cwd: string, instanceId?: string): void {
@@ -219,7 +219,7 @@ export function queueMessage(content: string, peerId: string, cwd: string, insta
     cwd,
     timestamp: new Date().toISOString(),
     uploaded: false,
-    instanceId: instanceId || getClaudeInstanceId() || undefined,
+    instanceId: instanceId || getInstanceId() || undefined,
   };
   appendFileSync(MESSAGE_QUEUE_FILE, JSON.stringify(message) + "\n");
 }
@@ -275,38 +275,38 @@ export function markMessagesUploaded(forCwd?: string): void {
 }
 
 // ============================================
-// CLAUDE Context File - self-summary
+// Work Context File - self-summary
 // ============================================
 
-export function getClaudeContextPath(): string {
-  return CLAUDE_CONTEXT_FILE;
+export function getWorkContextPath(): string {
+  return WORK_CONTEXT_FILE;
 }
 
-export function loadClaudeLocalContext(): string {
+export function loadLocalWorkContext(): string {
   ensureCacheDir();
-  if (!existsSync(CLAUDE_CONTEXT_FILE)) {
+  if (!existsSync(WORK_CONTEXT_FILE)) {
     return "";
   }
   try {
-    return readFileSync(CLAUDE_CONTEXT_FILE, "utf-8");
+    return readFileSync(WORK_CONTEXT_FILE, "utf-8");
   } catch {
     return "";
   }
 }
 
-export function saveClaudeLocalContext(content: string): void {
+export function saveLocalWorkContext(content: string): void {
   ensureCacheDir();
-  writeFileSync(CLAUDE_CONTEXT_FILE, content);
+  writeFileSync(WORK_CONTEXT_FILE, content);
 }
 
-export function appendClaudeWork(workDescription: string): void {
+export function appendWork(workDescription: string): void {
   ensureCacheDir();
   const timestamp = new Date().toISOString();
   const entry = `\n- [${timestamp}] ${workDescription}`;
 
-  let existing = loadClaudeLocalContext();
+  let existing = loadLocalWorkContext();
   if (!existing) {
-    existing = `# CLAUDE Work Context\n\nAuto-generated log of CLAUDE's recent work.\n\n## Recent Activity\n`;
+    existing = `# Work Context\n\nAuto-generated log of recent work.\n\n## Recent Activity\n`;
   }
 
   // Keep only last N entries to prevent file from growing too large
@@ -323,10 +323,10 @@ export function appendClaudeWork(workDescription: string): void {
     existing = [...header, ...recentActivities].join("\n");
   }
 
-  saveClaudeLocalContext(existing + entry);
+  saveLocalWorkContext(existing + entry);
 }
 
-export function generateClaudeSummary(
+export function generateSessionSummary(
   sessionName: string,
   workItems: string[],
   assistantMessages: string[]
@@ -345,12 +345,12 @@ export function generateClaudeSummary(
     }
   }
 
-  let summary = `# CLAUDE Work Context
+  let summary = `# Work Context
 
 Last updated: ${timestamp}
 Session: ${sessionName}
 
-## What CLAUDE Was Working On
+## What Was Being Worked On
 
 `;
 
@@ -526,5 +526,5 @@ export function clearAllCaches(): void {
   if (existsSync(CONTEXT_CACHE_FILE)) writeFileSync(CONTEXT_CACHE_FILE, "{}");
   if (existsSync(MESSAGE_QUEUE_FILE)) writeFileSync(MESSAGE_QUEUE_FILE, "");
   if (existsSync(GIT_STATE_FILE)) writeFileSync(GIT_STATE_FILE, "{}");
-  // Don't clear claude-context.md - that's valuable history
+  // Don't clear work-context.md - that's valuable history
 }

@@ -1,6 +1,6 @@
 import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
-import { appendClaudeWork, getClaudeInstanceId } from "../cache.js";
+import { appendWork, getInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
 interface CursorHookInput {
@@ -231,17 +231,17 @@ export async function handlePostToolUse(): Promise<void> {
   logHook("post-tool-use", summary, { tool: toolName });
 
   // INSTANT: Update local cursor context file (~2ms)
-  appendClaudeWork(summary);
+  appendWork(summary);
 
   // Upload to Honcho and wait for completion
-  await logToHonchoAsync(config, cwd, summary).catch((e) => logHook("post-tool-use", `Upload failed: ${e}`, { error: String(e) }));
+  await logToHonchoAsync(config, cwd, summary, hookInput.model).catch((e) => logHook("post-tool-use", `Upload failed: ${e}`, { error: String(e) }));
 
   // Cursor postToolUse: output empty JSON (no updated_mcp_tool_output for non-MCP tools)
   console.log(JSON.stringify({}));
   process.exit(0);
 }
 
-async function logToHonchoAsync(config: any, cwd: string, summary: string): Promise<void> {
+async function logToHonchoAsync(config: any, cwd: string, summary: string, model?: string): Promise<void> {
   // Skip if message saving is disabled
   if (config.saveMessages === false) {
     return;
@@ -256,12 +256,13 @@ async function logToHonchoAsync(config: any, cwd: string, summary: string): Prom
 
   // Log the tool use with instance_id and session_affinity for project-scoped fact extraction
   logApiCall("session.addMessages", "POST", `tool: ${summary.slice(0, 50)}`);
-  const instanceId = getClaudeInstanceId();
+  const instanceId = getInstanceId();
 
   await session.addMessages([
     cursorPeer.message(`[Tool] ${summary}`, {
       metadata: {
         instance_id: instanceId || undefined,
+        model,
         session_affinity: sessionName,
       },
     }),

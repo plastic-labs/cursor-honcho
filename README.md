@@ -65,7 +65,7 @@ export HONCHO_API_KEY="hch-your-api-key-here"
 
 # Optional (defaults shown)
 export HONCHO_PEER_NAME="$USER"           # Your name/identity
-export HONCHO_WORKSPACE="claude_code"     # Workspace name (shared with Claude Code!)
+export HONCHO_WORKSPACE="cursor"          # Workspace name
 export HONCHO_CURSOR_PEER="cursor"        # How the AI is identified
 ```
 
@@ -92,13 +92,7 @@ Restart Cursor. You should see the Honcho pixel art and memory loading on startu
 
 Cursor will interview you about your preferences to kickstart your profile.
 
-## Shared Memory with Claude Code
-
-If you also use the [claude-honcho](https://github.com/plastic-labs/claude-honcho) plugin, **memory is shared automatically**. Both tools use the same Honcho workspace, so your preferences and context carry across Claude Code and Cursor seamlessly.
-
-The AI peers are separate (`claude` vs `cursor`), so Honcho can distinguish who said what while maintaining a unified model of you.
-
-## Cursor-Exclusive Features
+## Features
 
 ### Subagent Memory
 
@@ -153,7 +147,7 @@ An always-applied rule reminds Cursor about its memory capabilities, ensuring it
 |----------|----------|---------|-------------|
 | `HONCHO_API_KEY` | **Yes** | -- | Your Honcho API key from [app.honcho.dev](https://app.honcho.dev) |
 | `HONCHO_PEER_NAME` | No | `$USER` | Your identity in the memory system |
-| `HONCHO_WORKSPACE` | No | `claude_code` | Workspace name (shared with Claude Code) |
+| `HONCHO_WORKSPACE` | No | `cursor` | Workspace name |
 | `HONCHO_CURSOR_PEER` | No | `cursor` | How the AI is identified |
 | `HONCHO_ENDPOINT` | No | `production` | `production`, `local`, or a custom URL |
 | `HONCHO_ENABLED` | No | `true` | Set to `false` to disable |
@@ -178,10 +172,18 @@ An always-applied rule reminds Cursor about its memory capabilities, ensuring it
 |                                                               |
 |   Messages + reasoning -> Persistent Memory ->                |
 |   Retrieved as context at session start                       |
-|                                                               |
-|   Shared workspace: Claude Code <-> Cursor                    |
 +---------------------------------------------------------------+
 ```
+
+## Cross-Surface Integration
+
+To share memory with other Honcho-connected tools (e.g. [claude-honcho](https://github.com/plastic-labs/claude-honcho)), set the same workspace on both sides:
+
+```bash
+export HONCHO_WORKSPACE="shared"  # Set identically in both tools
+```
+
+The AI peers remain separate (`cursor` vs `claude`), so Honcho distinguishes who said what while maintaining a unified model of you.
 
 ## Troubleshooting
 
