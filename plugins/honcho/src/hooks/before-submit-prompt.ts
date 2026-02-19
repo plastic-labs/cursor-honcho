@@ -117,7 +117,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   // Start upload immediately (we'll await before exit)
   let uploadPromise: Promise<void> | null = null;
   if (config.saveMessages !== false) {
-    uploadPromise = uploadMessageAsync(config, cwd, prompt);
+    uploadPromise = uploadMessageAsync(config, cwd, prompt, hookInput);
   }
 
   // Track message count for threshold-based knowledge graph refresh
@@ -182,7 +182,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   process.exit(0);
 }
 
-async function uploadMessageAsync(config: any, cwd: string, prompt: string): Promise<void> {
+async function uploadMessageAsync(config: any, cwd: string, prompt: string, hookInput?: any): Promise<void> {
   logApiCall("session.addMessages", "POST", `user prompt (${prompt.length} chars)`);
   const honcho = new Honcho(getHonchoClientOptions(config));
   const sessionName = getSessionName(cwd);
@@ -199,6 +199,10 @@ async function uploadMessageAsync(config: any, cwd: string, prompt: string): Pro
       metadata: {
         instance_id: instanceId || undefined,
         session_affinity: sessionName,
+        model: hookInput?.model || undefined,
+        cursor_version: hookInput?.cursor_version || undefined,
+        user_email: hookInput?.user_email || undefined,
+        generation_id: hookInput?.generation_id || undefined,
       }
     })
   );

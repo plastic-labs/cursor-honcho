@@ -159,6 +159,10 @@ export async function handleStop(): Promise<void> {
           instance_id: instanceId || undefined,
           type: "assistant_response",
           session_affinity: sessionName,
+          model: hookInput.model || undefined,
+          cursor_version: hookInput.cursor_version || undefined,
+          user_email: hookInput.user_email || undefined,
+          generation_id: hookInput.generation_id || undefined,
         },
       }),
     ]);
