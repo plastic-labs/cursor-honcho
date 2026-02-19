@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { getClaudeInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
@@ -37,7 +37,7 @@ export async function handleAfterAgentResponse(): Promise<void> {
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) hookInput = JSON.parse(input);
   } catch {
     process.exit(0);
@@ -58,12 +58,12 @@ export async function handleAfterAgentResponse(): Promise<void> {
     const honcho = new Honcho(getHonchoClientOptions(config));
     const sessionName = getSessionName(cwd);
     const session = await honcho.session(sessionName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
     const instanceId = getClaudeInstanceId();
 
     logApiCall("session.addMessages", "POST", `response (${text.length} chars)`);
     await session.addMessages([
-      cursorPeer.message(text.slice(0, 3000), {
+      aiPeer.message(text.slice(0, 3000), {
         metadata: {
           instance_id: instanceId || undefined,
           type: "assistant_response",

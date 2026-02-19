@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { existsSync, readFileSync } from "fs";
 import {
   getQueuedMessages,
@@ -198,7 +198,7 @@ export async function handleSessionEnd(): Promise<void> {
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
       hookInput = JSON.parse(input);
     }
@@ -225,7 +225,7 @@ export async function handleSessionEnd(): Promise<void> {
     // Get session and peers using fluent API
     const session = await honcho.session(sessionName);
     const userPeer = await honcho.peer(config.peerName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
 
     // Parse transcript
     const transcriptMessages = transcriptPath ? parseTranscript(transcriptPath) : [];
@@ -284,7 +284,7 @@ export async function handleSessionEnd(): Promise<void> {
         const messagesToSend = assistantMessages.flatMap((msg) => {
           const chunks = chunkContent(msg.content);
           return chunks.map(chunk =>
-            cursorPeer.message(chunk, {
+            aiPeer.message(chunk, {
               metadata: {
                 instance_id: instanceId || undefined,
                 type: msg.isMeaningful ? 'assistant_prose' : 'assistant_brief',
@@ -328,7 +328,7 @@ export async function handleSessionEnd(): Promise<void> {
     // Step 4: Log session end marker
     // =====================================================
     await session.addMessages([
-      cursorPeer.message(
+      aiPeer.message(
         `[Session ended] Reason: ${reason}, Messages: ${transcriptMessages.length}, Time: ${new Date().toISOString()}`,
         {
           metadata: {

@@ -1,9 +1,5 @@
 {
-<<<<<<< Updated upstream
-  "description": "Honcho memory hooks for Cursor sessions",
-=======
   "version": 1,
->>>>>>> Stashed changes
   "hooks": {
     "sessionStart": [
       {

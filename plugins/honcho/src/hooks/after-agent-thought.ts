@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { getClaudeInstanceId } from "../cache.js";
 import { logHook, setLogContext } from "../log.js";
 
@@ -25,7 +25,7 @@ export async function handleAfterAgentThought(): Promise<void> {
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) hookInput = JSON.parse(input);
   } catch {
     process.exit(0);
@@ -48,14 +48,14 @@ export async function handleAfterAgentThought(): Promise<void> {
     const honcho = new Honcho(getHonchoClientOptions(config));
     const sessionName = getSessionName(cwd);
     const session = await honcho.session(sessionName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
     const instanceId = getClaudeInstanceId();
 
     // Truncate to avoid API limits but keep the valuable reasoning
     const truncated = text.length > 4000 ? text.slice(0, 4000) + "..." : text;
 
     await session.addMessages([
-      cursorPeer.message(`[Reasoning] ${truncated}`, {
+      aiPeer.message(`[Reasoning] ${truncated}`, {
         metadata: {
           instance_id: instanceId || undefined,
           type: "agent_thought",

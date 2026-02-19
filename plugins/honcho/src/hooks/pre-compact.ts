@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { Spinner } from "../spinner.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 import { formatVerboseBlock, formatVerboseList } from "../visual.js";
@@ -28,7 +28,7 @@ interface CursorHookInput {
  * This is injected RIGHT BEFORE compaction so it becomes part of the summary
  */
 function formatMemoryCard(
-  config: { peerName: string; cursorPeer: string; workspace: string },
+  config: { peerName: string; aiPeer: string; workspace: string },
   sessionName: string,
   userContext: any,
   cursorContext: any,
@@ -45,7 +45,7 @@ These conclusions MUST be preserved in the summary.
 
 ### Session Identity
 - User: ${config.peerName}
-- AI: ${config.cursorPeer}
+- AI: ${config.aiPeer}
 - Workspace: ${config.workspace}
 - Session: ${sessionName}`);
 
@@ -65,7 +65,7 @@ ${userPeerCard.join("\n")}`);
   // Cursor's self-context - what was it working on
   const cursorRep = cursorContext?.representation;
   if (typeof cursorRep === "string" && cursorRep.trim()) {
-    parts.push(`### ${config.cursorPeer}'s Recent Work (PRESERVE)\n${cursorRep}`);
+    parts.push(`### ${config.aiPeer}'s Recent Work (PRESERVE)\n${cursorRep}`);
   }
 
   // Session summary - what we were doing
@@ -82,7 +82,7 @@ ${userDialectic}`);
   }
 
   if (cursorDialectic) {
-    parts.push(`### ${config.cursorPeer}'s Self-Reflection (PRESERVE)
+    parts.push(`### ${config.aiPeer}'s Self-Reflection (PRESERVE)
 ${cursorDialectic}`);
   }
 
@@ -107,7 +107,7 @@ export async function handlePreCompact(): Promise<void> {
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
       hookInput = JSON.parse(input);
     }
@@ -140,13 +140,13 @@ export async function handlePreCompact(): Promise<void> {
     // Get session and peers using fluent API
     const session = await honcho.session(sessionName);
     const userPeer = await honcho.peer(config.peerName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
 
     if (trigger === "auto") {
       spinner.update("fetching memory context");
     }
 
-    logApiCall("peer.context", "GET", `${config.peerName} + ${config.cursorPeer}`);
+    logApiCall("peer.context", "GET", `${config.peerName} + ${config.aiPeer}`);
     logApiCall("session.summaries", "GET", sessionName);
     logApiCall("peer.chat", "POST", "dialectic queries x2");
 
@@ -160,7 +160,7 @@ export async function handlePreCompact(): Promise<void> {
           includeMostFrequent: true,
         }),
         // Cursor's self-context
-        cursorPeer.context({
+        aiPeer.context({
           maxConclusions: 20,
           includeMostFrequent: true,
         }),
@@ -172,8 +172,8 @@ export async function handlePreCompact(): Promise<void> {
           { session }
         ),
         // Fresh dialectic - cursor self-reflection
-        cursorPeer.chat(
-          `What are the most important things ${config.cursorPeer} was working on with ${config.peerName}? Summarize key context that should be preserved.`,
+        aiPeer.chat(
+          `What are the most important things ${config.aiPeer} was working on with ${config.peerName}? Summarize key context that should be preserved.`,
           { session }
         ),
       ]);
@@ -218,14 +218,14 @@ export async function handlePreCompact(): Promise<void> {
       verboseBlocks.push(formatVerboseBlock(`pre-compact peer.chat(user) -> "${config.peerName}"`, userDialectic));
     }
     if (cursorDialectic) {
-      verboseBlocks.push(formatVerboseBlock(`pre-compact peer.chat(cursor) -> "${config.cursorPeer}"`, cursorDialectic));
+      verboseBlocks.push(formatVerboseBlock(`pre-compact peer.chat(cursor) -> "${config.aiPeer}"`, cursorDialectic));
     }
 
     logHook("pre-compact", `Memory anchored (${memoryCard.length} chars)`);
 
     // Output Cursor-format JSON with the memory anchor as user_message
     const output = {
-      user_message: `[${config.cursorPeer}/Honcho Memory Anchor]\n\n${memoryCard}`,
+      user_message: `[${config.aiPeer}/Honcho Memory Anchor]\n\n${memoryCard}`,
     };
     console.log(JSON.stringify(output));
     process.exit(0);

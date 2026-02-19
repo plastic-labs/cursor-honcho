@@ -46,7 +46,7 @@ async function setup(): Promise<void> {
     console.log(s.success("Connected to Honcho API"));
     console.log(`  ${s.label("Workspace")}: ${config.workspace}`);
     console.log(`  ${s.label("Peer")}:      ${config.peerName}`);
-    console.log(`  ${s.label("AI Peer")}:   ${config.cursorPeer}`);
+    console.log(`  ${s.label("AI Peer")}:   ${config.aiPeer}`);
     console.log("");
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -64,7 +64,7 @@ async function setup(): Promise<void> {
       apiKey: config.apiKey,
       peerName: config.peerName,
       workspace: "cursor",
-      cursorPeer: "cursor",
+      aiPeer: "cursor",
       saveMessages: true,
       enabled: true,
       logging: true,

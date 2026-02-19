@@ -53,34 +53,34 @@ In any project where you want Honcho memory, create a `.cursor/` directory with 
   "version": 1,
   "hooks": {
     "sessionStart": [
-      { "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/session-start.ts" }
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/session-start.ts" }
     ],
     "sessionEnd": [
-      { "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/session-end.ts" }
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/session-end.ts" }
     ],
     "beforeSubmitPrompt": [
-      { "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/before-submit-prompt.ts" }
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/before-submit-prompt.ts" }
     ],
     "postToolUse": [
       {
-        "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/post-tool-use.ts",
+        "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/post-tool-use.ts",
         "matcher": "Write|Edit|Shell|Task|MCP"
       }
     ],
     "preCompact": [
-      { "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/pre-compact.ts" }
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/pre-compact.ts" }
     ],
     "stop": [
-      { "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/stop.ts" }
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/stop.ts" }
     ],
     "subagentStop": [
-      { "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/subagent-stop.ts" }
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/subagent-stop.ts" }
     ],
     "afterAgentThought": [
-      { "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/after-agent-thought.ts" }
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/after-agent-thought.ts" }
     ],
     "afterAgentResponse": [
-      { "command": "HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor bun run /path/to/cursor-honcho/plugins/honcho/hooks/after-agent-response.ts" }
+      { "command": "bun run /path/to/cursor-honcho/plugins/honcho/hooks/after-agent-response.ts" }
     ]
   }
 }
@@ -95,11 +95,7 @@ Replace `/path/to/cursor-honcho` with the actual absolute path to this repo on y
   "mcpServers": {
     "honcho": {
       "command": "bun",
-      "args": ["run", "/path/to/cursor-honcho/plugins/honcho/mcp-server.ts"],
-      "env": {
-        "HONCHO_WORKSPACE": "cursor",
-        "HONCHO_CURSOR_PEER": "cursor"
-      }
+      "args": ["run", "/path/to/cursor-honcho/plugins/honcho/mcp-server.ts"]
     }
   }
 }
@@ -126,12 +122,6 @@ Open a new chat. If everything is configured, Honcho will inject memory context 
 - Open a new chat and check if the AI knows your name/preferences
 - Run `/honcho:status` to see the connection status
 - Run `/honcho:setup` for guided configuration if something isn't working
-
-## Important: env var prefixes
-
-The `HONCHO_WORKSPACE=cursor HONCHO_CURSOR_PEER=cursor` prefixes in hooks.json are critical. Without them, the plugin may inherit `HONCHO_WORKSPACE=claude-code` from your shell if you also use Claude Code, causing identity conflicts.
-
-The `env` block in mcp.json serves the same purpose for the MCP server.
 
 ## Features
 
@@ -185,8 +175,8 @@ The `afterAgentThought` hook captures substantial AI reasoning (extended thinkin
 |----------|----------|---------|-------------|
 | `HONCHO_API_KEY` | **Yes** | -- | Your Honcho API key from [app.honcho.dev](https://app.honcho.dev) |
 | `HONCHO_PEER_NAME` | No | `$USER` | Your identity in the memory system |
-| `HONCHO_WORKSPACE` | No | `cursor` | Workspace name |
-| `HONCHO_CURSOR_PEER` | No | `cursor` | How the AI is identified |
+| `HONCHO_WORKSPACE` | No | auto-detected | Workspace name (auto-detected from host) |
+| `HONCHO_AI_PEER` | No | auto-detected | How the AI is identified (auto-detected from host) |
 | `HONCHO_ENDPOINT` | No | `production` | `production`, `local`, or a custom URL |
 | `HONCHO_ENABLED` | No | `true` | Set to `false` to disable |
 | `HONCHO_SAVE_MESSAGES` | No | `true` | Set to `false` to stop saving messages |
@@ -203,14 +193,12 @@ The `afterAgentThought` hook captures substantial AI reasoning (extended thinkin
 ### MCP tools not available
 
 1. Check `.cursor/mcp.json` exists in your project root with the correct absolute path
-2. Make sure the `env` block includes `HONCHO_WORKSPACE` and `HONCHO_CURSOR_PEER`
-3. Restart Cursor after changing MCP config
+2. Restart Cursor after changing MCP config
 
 ### sessionStart context not loading
 
 1. The hooks.json paths must be absolute (not relative)
-2. The `HONCHO_WORKSPACE=cursor` prefix must be part of the command string
-3. Check Cursor's hook logs for JSON parse errors -- if you see ANSI escape codes in the output, update to the latest version which suppresses TTY output in non-interactive mode
+2. Check Cursor's hook logs for JSON parse errors -- if you see ANSI escape codes in the output, update to the latest version which suppresses TTY output in non-interactive mode
 
 ### Using a local Honcho instance
 

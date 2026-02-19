@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getHonchoClientOptions, getSessionName } from "../config.js";
+import { loadConfig, getHonchoClientOptions, getSessionName, setDetectedHost } from "../config.js";
 
 const SETUP_MESSAGE = `Honcho is not configured. To enable persistent memory:
 
@@ -17,6 +17,7 @@ const SETUP_MESSAGE = `Honcho is not configured. To enable persistent memory:
 Or run /honcho:setup for guided configuration.`;
 
 export async function runMcpServer(): Promise<void> {
+  setDetectedHost("cursor");
   const config = loadConfig();
   const configured = config !== null;
 

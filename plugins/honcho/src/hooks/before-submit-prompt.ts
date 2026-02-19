@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import {
   getCachedUserContext,
   isContextCacheStale,
@@ -87,7 +87,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
       hookInput = JSON.parse(input);
     }
@@ -148,7 +148,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
 
     const contextParts = formatCachedContext(cachedContext, config.peerName);
     if (contextParts.length > 0) {
-      outputContext(config.peerName, config.cursorPeer, contextParts);
+      outputContext(config.peerName, config.aiPeer, contextParts);
     } else {
       // No context to inject, just continue
       console.log(JSON.stringify({ continue: true }));
@@ -164,7 +164,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   try {
     const { parts: contextParts, conclusionCount } = await fetchFreshContext(config, cwd, prompt);
     if (contextParts.length > 0) {
-      outputContext(config.peerName, config.cursorPeer, contextParts);
+      outputContext(config.peerName, config.aiPeer, contextParts);
     } else {
       console.log(JSON.stringify({ continue: true }));
     }
@@ -286,7 +286,7 @@ async function fetchFreshContext(config: any, cwd: string, prompt: string): Prom
  * Output Cursor-format JSON with context injected via user_message.
  * Cursor's beforeSubmitPrompt expects: { continue: true, user_message: "..." }
  */
-function outputContext(peerName: string, cursorPeer: string, contextParts: string[]): void {
+function outputContext(peerName: string, aiPeer: string, contextParts: string[]): void {
   const output = {
     continue: true,
     user_message: `[Honcho Memory for ${peerName}]: ${contextParts.join(" | ")}`,

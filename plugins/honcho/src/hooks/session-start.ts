@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, setSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionForPath, setSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import {
   setCachedUserContext,
   setCachedClaudeContext,
@@ -67,7 +67,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
       hookInput = JSON.parse(input);
     }
@@ -108,23 +108,23 @@ Or run \`/honcho:setup\` for guided configuration.`;
 
   try {
     logHook("session-start", `Starting session in ${cwd}`, { branch: currentGitState?.branch });
-    logFlow("init", `workspace: ${config.workspace}, peers: ${config.peerName}/${config.cursorPeer}`);
+    logFlow("init", `workspace: ${config.workspace}, peers: ${config.peerName}/${config.aiPeer}`);
 
     const honcho = new Honcho(getHonchoClientOptions(config));
 
     if (!isBackground && isTTY) spinner.update("Loading session");
 
-    const [session, userPeer, cursorPeerObj] = await Promise.all([
+    const [session, userPeer, aiPeerObj] = await Promise.all([
       honcho.session(sessionName),
       honcho.peer(config.peerName),
-      honcho.peer(config.cursorPeer),
+      honcho.peer(config.aiPeer),
     ]);
     logApiCall("honcho.session/peer", "GET", `session + 2 peers`, Date.now(), true);
 
     // Set peer observation config (fire-and-forget)
     Promise.all([
       session.setPeerConfiguration(userPeer, { observeMe: true, observeOthers: false }),
-      session.setPeerConfiguration(cursorPeerObj, { observeMe: false, observeOthers: true }),
+      session.setPeerConfiguration(aiPeerObj, { observeMe: false, observeOthers: true }),
     ]).catch((e) => logHook("session-start", `Set peers failed: ${e}`));
 
     if (!getSessionForPath(cwd)) {
@@ -160,7 +160,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
 
     let headerContent = `## Honcho Memory System Active
 - User: ${config.peerName}
-- AI: ${config.cursorPeer}
+- AI: ${config.aiPeer}
 - Workspace: ${config.workspace}
 - Session: ${sessionName}
 - Directory: ${cwd}`;
@@ -221,14 +221,14 @@ Or run \`/honcho:setup\` for guided configuration.`;
     const [userContextResult, cursorContextResult, summariesResult, userChatResult, cursorChatResult] =
       await Promise.allSettled([
         userPeer.context({ maxConclusions: 25, includeMostFrequent: true }),
-        cursorPeerObj.context({ maxConclusions: 15, includeMostFrequent: true }),
+        aiPeerObj.context({ maxConclusions: 15, includeMostFrequent: true }),
         session.summaries(),
         userPeer.chat(
           `Summarize what you know about ${config.peerName} in 2-3 sentences. Focus on their preferences, current projects, and working style.${branchContext}${changeContext}${featureHint}`,
           { session }
         ),
-        cursorPeerObj.chat(
-          `What has ${config.cursorPeer} been working on recently?${branchContext}${featureHint} Summarize the AI assistant's recent activities and focus areas relevant to the current work context.`,
+        aiPeerObj.chat(
+          `What has ${config.aiPeer} been working on recently?${branchContext}${featureHint} Summarize the AI assistant's recent activities and focus areas relevant to the current work context.`,
           { session }
         ),
       ]);
@@ -264,7 +264,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
     }
     if (cursorChatResult.status === "fulfilled") {
       const chatVal = typeof cursorChatResult.value === "string" ? cursorChatResult.value : (cursorChatResult.value as any)?.content;
-      verboseApiResult(`peer.chat(cursor) -> "${config.cursorPeer}"`, chatVal);
+      verboseApiResult(`peer.chat(cursor) -> "${config.aiPeer}"`, chatVal);
     }
 
     // Build context sections
@@ -293,7 +293,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
       if (rep) {
         const repText = formatRepresentation(rep);
         if (repText) {
-          contextParts.push(`## ${config.cursorPeer}'s Work History (Self-Context)\n${repText}`);
+          contextParts.push(`## ${config.aiPeer}'s Work History (Self-Context)\n${repText}`);
         }
       }
     }
@@ -317,7 +317,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
       ? (typeof cursorChatResult.value === "string" ? cursorChatResult.value : (cursorChatResult.value as any)?.content)
       : null;
     if (cursorChatContent) {
-      contextParts.push(`## AI Self-Reflection (What ${config.cursorPeer} Has Been Doing)\n${cursorChatContent}`);
+      contextParts.push(`## AI Self-Reflection (What ${config.aiPeer} Has Been Doing)\n${cursorChatContent}`);
     }
 
     if (!isBackground && isTTY) spinner.stop();
@@ -331,7 +331,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
     }
 
     // Output Cursor-format JSON
-    const memoryContext = `[${config.cursorPeer}/Honcho Memory Loaded]\n\n${contextParts.join("\n\n")}`;
+    const memoryContext = `[${config.aiPeer}/Honcho Memory Loaded]\n\n${contextParts.join("\n\n")}`;
     const output = {
       additional_context: memoryContext,
       user_message: `[honcho] Memory loaded: ${contextParts.length} sections, ${successCount}/5 sources`,
