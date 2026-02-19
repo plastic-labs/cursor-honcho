@@ -10,8 +10,18 @@
   "repository": "https://github.com/plastic-labs/cursor-honcho",
   "license": "MIT",
   "keywords": ["memory", "context", "ai", "honcho", "persistence", "cursor"],
+<<<<<<< Updated upstream
   "skills": "./skills/",
   "agents": "./agents/",
   "commands": "./commands/",
   "rules": "./rules/"
+=======
+  "logo": "assets/logo.svg",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./mcp.json",
+  "skills": "./skills/",
+  "rules": "./rules/",
+  "agents": "./agents/",
+  "commands": "./commands/"
+>>>>>>> Stashed changes
 }

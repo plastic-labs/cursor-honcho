@@ -7,12 +7,18 @@ import {
 import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getHonchoClientOptions, getSessionName } from "../config.js";
 
+const SETUP_MESSAGE = `Honcho is not configured. To enable persistent memory:
+
+1. Get a free API key at https://app.honcho.dev
+2. Add to your shell config (~/.zshrc or ~/.bashrc):
+   export HONCHO_API_KEY="your-key-here"
+3. Restart Cursor
+
+Or run /honcho:setup for guided configuration.`;
+
 export async function runMcpServer(): Promise<void> {
   const config = loadConfig();
-  if (!config) {
-    console.error("[honcho-mcp] Not configured. Set HONCHO_API_KEY environment variable.");
-    process.exit(1);
-  }
+  const configured = config !== null;
 
   const server = new Server(
     {
@@ -26,7 +32,7 @@ export async function runMcpServer(): Promise<void> {
     }
   );
 
-  const honcho = new Honcho(getHonchoClientOptions(config));
+  const honcho = configured ? new Honcho(getHonchoClientOptions(config)) : null;
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
@@ -83,6 +89,13 @@ export async function runMcpServer(): Promise<void> {
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (!honcho || !config) {
+      return {
+        content: [{ type: "text", text: SETUP_MESSAGE }],
+        isError: true,
+      };
+    }
+
     const { name, arguments: args } = request.params;
     const cwd = process.env.CURSOR_PROJECT_DIR || process.cwd();
     const sessionName = getSessionName(cwd);

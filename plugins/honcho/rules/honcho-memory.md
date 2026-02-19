@@ -21,3 +21,10 @@ You have persistent memory via Honcho. Context about the user, their preferences
 - When you discover a new user preference or pattern, save it with `create_conclusion`.
 - Reference past work naturally ("Last time we worked on X, you preferred Y...").
 - If context seems stale or you need deeper history, use the search tool.
+
+## If Honcho is not configured
+
+If the session start context says Honcho is not configured, or if MCP tool calls return setup instructions instead of results:
+- Suggest running `/honcho:setup` for guided first-time configuration.
+- The user needs a free API key from https://app.honcho.dev and must set `HONCHO_API_KEY` in their shell config.
+- Do not repeatedly attempt MCP tool calls that will fail -- help the user get set up first.

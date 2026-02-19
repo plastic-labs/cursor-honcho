@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "honcho": {
+      "command": "bun",
+      "args": ["run", "./mcp-server.ts"],
+      "env": {
+        "HONCHO_WORKSPACE": "cursor",
+        "HONCHO_CURSOR_PEER": "cursor"
+      }
+    }
+  }
+}

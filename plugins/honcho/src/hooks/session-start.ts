@@ -40,8 +40,25 @@ function formatRepresentation(rep: any): string {
 export async function handleSessionStart(): Promise<void> {
   const config = loadConfig();
   if (!config) {
-    console.error("[honcho] Not configured. Set HONCHO_API_KEY environment variable.");
-    process.exit(1);
+    const setupMessage = `## Honcho Memory -- Setup Required
+
+Honcho is installed but not yet configured. To enable persistent memory:
+
+1. Get a free API key at https://app.honcho.dev
+2. Add it to your shell config (~/.zshrc or ~/.bashrc):
+   \`\`\`
+   export HONCHO_API_KEY="your-key-here"
+   \`\`\`
+3. Restart Cursor to pick up the new environment variable
+
+Or run \`/honcho:setup\` for guided configuration.`;
+
+    const output = {
+      additional_context: setupMessage,
+      user_message: "[honcho] Not configured -- run /honcho:setup or set HONCHO_API_KEY",
+    };
+    console.log(JSON.stringify(output));
+    process.exit(0);
   }
 
   if (!isPluginEnabled()) {
