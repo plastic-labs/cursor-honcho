@@ -99,9 +99,10 @@ Or run \`/honcho:setup\` for guided configuration.`;
     setCachedGitState(cwd, currentGitState);
   }
 
-  // Start loading animation (skip for background agents)
+  // Start loading animation (skip for background agents and non-TTY like Cursor hooks)
+  const isTTY = process.stderr.isTTY;
   const spinner = new Spinner({ style: "neural" });
-  if (!isBackground) {
+  if (!isBackground && isTTY) {
     spinner.start("loading memory");
   }
 
@@ -111,7 +112,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
 
     const honcho = new Honcho(getHonchoClientOptions(config));
 
-    if (!isBackground) spinner.update("Loading session");
+    if (!isBackground && isTTY) spinner.update("Loading session");
 
     const [session, userPeer, cursorPeerObj] = await Promise.all([
       honcho.session(sessionName),
@@ -153,7 +154,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
     }
 
     // Parallel context fetch
-    if (!isBackground) spinner.update("Fetching memory context");
+    if (!isBackground && isTTY) spinner.update("Fetching memory context");
     logAsync("context-fetch", "Starting 5 parallel context fetches");
     const contextParts: string[] = [];
 
@@ -319,12 +320,12 @@ Or run \`/honcho:setup\` for guided configuration.`;
       contextParts.push(`## AI Self-Reflection (What ${config.cursorPeer} Has Been Doing)\n${cursorChatContent}`);
     }
 
-    if (!isBackground) spinner.stop();
+    if (!isBackground && isTTY) spinner.stop();
 
     logFlow("complete", `Memory loaded: ${contextParts.length} sections, ${successCount}/5 API calls succeeded`);
 
-    // Display pixel art to TTY
-    if (!isBackground) {
+    // Display pixel art only when stdout is a real TTY (Claude Code terminal, not Cursor hooks)
+    if (!isBackground && process.stdout.isTTY) {
       const { displayHonchoStartupTTY } = await import("../pixel.js");
       displayHonchoStartupTTY("Honcho Memory", "persistent context");
     }
@@ -339,7 +340,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
     process.exit(0);
   } catch (error) {
     logHook("session-start", `Error: ${error}`, { error: String(error) });
-    if (!isBackground) spinner.fail("memory load failed");
+    if (!isBackground && isTTY) spinner.fail("memory load failed");
     console.error(`[honcho] ${error}`);
     process.exit(1);
   }
