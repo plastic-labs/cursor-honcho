@@ -206,7 +206,7 @@ export async function handleSessionEnd(): Promise<void> {
     // Continue with defaults
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const reason = hookInput.reason || "unknown";
   const transcriptPath = hookInput.transcript_path;
 

@@ -34,7 +34,7 @@ export async function handleSubagentStop(): Promise<void> {
     process.exit(0);
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const subagentType = hookInput.subagent_type || "unknown";
   const status = hookInput.status || "unknown";
   const result = hookInput.result || "";

@@ -96,7 +96,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   }
 
   const prompt = hookInput.prompt || "";
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
 
   // Set log context for this hook
   setLogContext(cwd, getSessionName(cwd));

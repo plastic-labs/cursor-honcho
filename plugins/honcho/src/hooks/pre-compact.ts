@@ -115,7 +115,7 @@ export async function handlePreCompact(): Promise<void> {
     // No input, continue with defaults
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const trigger = hookInput.trigger || "auto";
   const isFirstCompaction = hookInput.is_first_compaction;
 

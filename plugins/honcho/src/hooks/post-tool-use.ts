@@ -216,7 +216,7 @@ export async function handlePostToolUse(): Promise<void> {
   const toolName = hookInput.tool_name || "";
   const toolInput = hookInput.tool_input || {};
   const toolOutput = hookInput.tool_output || {};
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
 
   // Set log context
   setLogContext(cwd, getSessionName(cwd));

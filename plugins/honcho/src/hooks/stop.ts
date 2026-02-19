@@ -123,7 +123,7 @@ export async function handleStop(): Promise<void> {
     process.exit(0);
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const transcriptPath = hookInput.transcript_path;
   const sessionName = getSessionName(cwd);
 

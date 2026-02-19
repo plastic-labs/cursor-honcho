@@ -75,7 +75,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
     // No input or invalid JSON
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const cursorInstanceId = hookInput.conversation_id || hookInput.session_id;
   const isBackground = hookInput.is_background_agent || false;
 
