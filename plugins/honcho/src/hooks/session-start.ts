@@ -205,7 +205,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
 
     const localContext = loadLocalWorkContext();
     if (localContext) {
-      contextParts.push(`## CLAUDE Local Context (What I Was Working On)\n${localContext.slice(0, 2000)}`);
+      contextParts.push(`## Local Context (What I Was Working On)\n${localContext.slice(0, 2000)}`);
     }
 
     // Context-aware dialectic queries

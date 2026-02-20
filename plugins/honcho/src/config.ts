@@ -66,6 +66,11 @@ const DEFAULT_WORKSPACE: Record<HonchoHost, string> = {
   "claude-code": "claude-code",
 };
 
+const DEFAULT_AI_PEER: Record<HonchoHost, string> = {
+  "cursor": "cursor",
+  "claude-code": "clawd",
+};
+
 // Stdin cache: entry points read stdin once, handlers consume from cache
 let _stdinText: string | null = null;
 
@@ -159,7 +164,7 @@ function resolveConfig(raw: HonchoFileConfig, host: HonchoHost): HonchoConfig | 
   const hostBlock = raw.hosts?.[host];
   if (hostBlock) {
     workspace = hostBlock.workspace ?? DEFAULT_WORKSPACE[host];
-    aiPeer = hostBlock.aiPeer ?? host;
+    aiPeer = hostBlock.aiPeer ?? DEFAULT_AI_PEER[host];
   } else {
     // Legacy fallback
     workspace = raw.workspace ?? DEFAULT_WORKSPACE[host];
@@ -197,7 +202,7 @@ export function loadConfigFromEnv(host?: HonchoHost): HonchoConfig | null {
   const resolvedHost = host ?? getDetectedHost();
   const peerName = process.env.HONCHO_PEER_NAME || process.env.USER || "user";
   const workspace = process.env.HONCHO_WORKSPACE || DEFAULT_WORKSPACE[resolvedHost];
-  const aiPeer = process.env.HONCHO_AI_PEER || process.env.HONCHO_CURSOR_PEER || process.env.HONCHO_CLAUDE_PEER || resolvedHost;
+  const aiPeer = process.env.HONCHO_AI_PEER || process.env.HONCHO_CURSOR_PEER || process.env.HONCHO_CLAUDE_PEER || DEFAULT_AI_PEER[resolvedHost];
   const endpoint = process.env.HONCHO_ENDPOINT;
 
   const config: HonchoConfig = {

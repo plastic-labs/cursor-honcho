@@ -288,7 +288,7 @@ export async function handleSessionEnd(): Promise<void> {
             aiPeer.message(chunk, {
               metadata: {
                 instance_id: instanceId || undefined,
-                model: hookInput.model,
+                model: hookInput.model || undefined,
                 type: msg.isMeaningful ? 'assistant_prose' : 'assistant_brief',
                 meaningful: msg.isMeaningful || false,
                 session_affinity: sessionName,
@@ -335,7 +335,7 @@ export async function handleSessionEnd(): Promise<void> {
         {
           metadata: {
             instance_id: instanceId || undefined,
-            model: hookInput.model,
+            model: hookInput.model || undefined,
             session_affinity: sessionName,
           },
         }

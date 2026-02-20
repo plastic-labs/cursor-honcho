@@ -1,11 +1,13 @@
-# Honcho Plugins for Cursor
+# Honcho Plugins
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Honcho](https://img.shields.io/badge/Honcho-Memory%20API-blue)](https://honcho.dev)
 
 ![Honcho x Cursor](assets/banner.png)
 
-Give [Cursor](https://cursor.com) persistent memory powered by [Honcho](https://honcho.dev). Your AI assistant remembers what you're working on, your preferences, and what it was doing -- across context wipes, session restarts, and tab closures.
+Give [Cursor](https://cursor.com) and [Claude Code](https://github.com/plastic-labs/claude-honcho) persistent memory powered by [Honcho](https://honcho.dev). Your AI assistant remembers what you're working on, your preferences, and what it was doing -- across context wipes, session restarts, and tab closures.
+
+> **Claude Code users**: See [claude-honcho](https://github.com/plastic-labs/claude-honcho) for Claude Code-specific installation. The underlying plugin codebase is shared and host-aware.
 
 ## Plugins
 
@@ -168,6 +170,29 @@ The `afterAgentThought` hook captures substantial AI reasoning (extended thinkin
 | `subagentStop` | Save subagent results to memory |
 | `afterAgentThought` | Capture deep reasoning |
 | `afterAgentResponse` | Save assistant prose responses |
+
+## Global Configuration
+
+Honcho stores persistent config at `~/.honcho/config.json`. This is created automatically on first run, or you can edit it manually:
+
+```json
+{
+  "apiKey": "hch-your-key-here",
+  "peerName": "eri",
+  "hosts": {
+    "cursor": {
+      "workspace": "cursor",
+      "aiPeer": "cursor"
+    },
+    "claude-code": {
+      "workspace": "claude-code",
+      "aiPeer": "clawd"
+    }
+  }
+}
+```
+
+Each host gets its own `workspace` and `aiPeer` identity. The `peerName` (your identity) is shared across hosts. If you use both [cursor-honcho](https://github.com/plastic-labs/cursor-honcho) and [claude-honcho](https://github.com/plastic-labs/claude-honcho), they read the same config file without conflicts.
 
 ## Environment Variables
 
