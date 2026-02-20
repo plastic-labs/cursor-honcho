@@ -4,20 +4,21 @@ import { getClaudeInstanceId, appendClaudeWork } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
 interface CursorHookInput {
-  conversation_id?: string;
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  subagent_type?: string;
+  status?: string;
+  result?: string;
+  duration?: number;
+  agent_transcript_path?: string;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  subagent_type?: string;
-  status?: string;
-  result?: string;
-  duration?: number;
-  agent_transcript_path?: string;
 }
 
 export async function handleSubagentStop(): Promise<void> {

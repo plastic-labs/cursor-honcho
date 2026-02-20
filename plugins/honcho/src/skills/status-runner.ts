@@ -4,7 +4,7 @@ import {
   getConfigPath,
   getEndpointInfo,
   isPluginEnabled,
-  getCursorSettingsPath,
+  getDetectedHost,
 } from "../config.js";
 import { checkHooksInstalled, verifyCommandAvailable } from "../install.js";
 import { loadIdCache, loadContextCache, getClaudeInstanceId } from "../cache.js";
@@ -25,7 +25,7 @@ function status(): void {
   const enabled = isPluginEnabled();
   console.log(s.section("Plugin Status"));
   console.log(`  ${s.label("Status")}:        ${enabled ? s.success("enabled") : s.warn("disabled")}`);
-  console.log(`  ${s.label("Platform")}:      Cursor`);
+  console.log(`  ${s.label("Platform")}:      ${getDetectedHost()}`);
   console.log("");
 
   console.log(s.section("Configuration"));

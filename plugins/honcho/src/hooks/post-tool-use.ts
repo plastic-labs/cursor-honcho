@@ -2,32 +2,36 @@ import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { appendClaudeWork, getClaudeInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
+import { outputToolCapture } from "../output.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  tool_name?: string;
+  tool_input?: Record<string, any>;
+  tool_output?: Record<string, any>;
+  tool_response?: Record<string, any>;  // Claude Code name for tool_output
+  tool_use_id?: string;
+  duration?: number;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  tool_name?: string;
-  tool_input?: Record<string, any>;
-  tool_output?: Record<string, any>;
-  tool_use_id?: string;
-  duration?: number;
 }
 
 function shouldLogTool(toolName: string, toolInput: Record<string, any>): boolean {
-  const significantTools = new Set(["Write", "Edit", "Bash", "Task", "NotebookEdit"]);
+  // Bash (Claude Code) and Shell (Cursor) are the same tool
+  const significantTools = new Set(["Write", "Edit", "Bash", "Shell", "Task", "NotebookEdit"]);
 
   if (!significantTools.has(toolName)) {
     return false;
   }
 
-  if (toolName === "Bash") {
+  if (toolName === "Bash" || toolName === "Shell") {
     const command = toolInput.command || "";
     // Skip read-only or trivial bash commands
     const trivialCommands = ["ls", "pwd", "echo", "cat", "head", "tail", "which", "type", "git status", "git log", "git diff"];
@@ -203,7 +207,7 @@ export async function handlePostToolUse(): Promise<void> {
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
     const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
@@ -215,29 +219,28 @@ export async function handlePostToolUse(): Promise<void> {
 
   const toolName = hookInput.tool_name || "";
   const toolInput = hookInput.tool_input || {};
-  const toolOutput = hookInput.tool_output || {};
+  const toolOutput = hookInput.tool_output || hookInput.tool_response || {};
   const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
 
   // Set log context
   setLogContext(cwd, getSessionName(cwd));
 
   if (!shouldLogTool(toolName, toolInput)) {
-    // Cursor postToolUse expects empty JSON when no action taken
-    console.log(JSON.stringify({}));
     process.exit(0);
   }
 
   const summary = formatToolSummary(toolName, toolInput, toolOutput);
   logHook("post-tool-use", summary, { tool: toolName });
 
-  // INSTANT: Update local cursor context file (~2ms)
+  // Host-aware output
+  outputToolCapture(summary);
+
+  // INSTANT: Update local context file (~2ms)
   appendClaudeWork(summary);
 
   // Upload to Honcho and wait for completion
   await logToHonchoAsync(config, cwd, summary).catch((e) => logHook("post-tool-use", `Upload failed: ${e}`, { error: String(e) }));
 
-  // Cursor postToolUse: output empty JSON (no updated_mcp_tool_output for non-MCP tools)
-  console.log(JSON.stringify({}));
   process.exit(0);
 }
 

@@ -13,18 +13,20 @@ import {
 } from "../cache.js";
 import { logHook, logApiCall, logCache, setLogContext } from "../log.js";
 import { verboseApiResult, verboseList } from "../visual.js";
+import { outputPromptContext, outputPromptContinue } from "../output.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
   session_id?: string;
+  transcript_path?: string;
+  prompt?: string;
+  cwd?: string;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  prompt?: string;
   attachments?: any[];
 }
 
@@ -85,7 +87,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
     const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
@@ -128,7 +130,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
     logHook("before-submit-prompt", "Skipping context (trivial prompt)");
     if (uploadPromise) await uploadPromise.catch((e) => logHook("before-submit-prompt", `Upload failed: ${e}`, { error: String(e) }));
     // Output continue with no extra context
-    console.log(JSON.stringify({ continue: true }));
+    outputPromptContinue();
     process.exit(0);
   }
 
@@ -148,10 +150,14 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
 
     const contextParts = formatCachedContext(cachedContext, config.peerName);
     if (contextParts.length > 0) {
-      outputContext(config.peerName, config.aiPeer, contextParts);
+      outputPromptContext({
+        peerName: config.peerName,
+        aiPeer: config.aiPeer,
+        contextParts,
+        systemMsg: `[honcho] user-prompt \u2190 context injected (cached)`,
+      });
     } else {
-      // No context to inject, just continue
-      console.log(JSON.stringify({ continue: true }));
+      outputPromptContinue("[honcho] user-prompt \u2022 no cached context available");
     }
     if (uploadPromise) await uploadPromise.catch((e) => logHook("before-submit-prompt", `Upload failed: ${e}`, { error: String(e) }));
     process.exit(0);
@@ -164,9 +170,14 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   try {
     const { parts: contextParts, conclusionCount } = await fetchFreshContext(config, cwd, prompt);
     if (contextParts.length > 0) {
-      outputContext(config.peerName, config.aiPeer, contextParts);
+      outputPromptContext({
+        peerName: config.peerName,
+        aiPeer: config.aiPeer,
+        contextParts,
+        systemMsg: `[honcho] user-prompt \u2190 fresh context injected`,
+      });
     } else {
-      console.log(JSON.stringify({ continue: true }));
+      outputPromptContinue("[honcho] user-prompt \u2022 no matching context found");
     }
     // Mark that we refreshed the knowledge graph
     if (forceRefresh) {
@@ -174,7 +185,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
     }
   } catch {
     // Don't block prompt submission on failure
-    console.log(JSON.stringify({ continue: true }));
+    outputPromptContinue("[honcho] user-prompt \u2717 context fetch failed");
   }
 
   // Ensure upload completes before exit
@@ -286,14 +297,3 @@ async function fetchFreshContext(config: any, cwd: string, prompt: string): Prom
   return { parts: contextParts, conclusionCount };
 }
 
-/**
- * Output Cursor-format JSON with context injected via user_message.
- * Cursor's beforeSubmitPrompt expects: { continue: true, user_message: "..." }
- */
-function outputContext(peerName: string, aiPeer: string, contextParts: string[]): void {
-  const output = {
-    continue: true,
-    user_message: `[Honcho Memory for ${peerName}]: ${contextParts.join(" | ")}`,
-  };
-  console.log(JSON.stringify(output));
-}

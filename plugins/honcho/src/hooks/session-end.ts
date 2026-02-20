@@ -13,17 +13,18 @@ import {
 import { playCooldown } from "../spinner.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  reason?: string;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  reason?: string;
   duration_ms?: number;
   is_background_agent?: boolean;
   final_status?: string;
@@ -196,7 +197,7 @@ export async function handleSessionEnd(): Promise<void> {
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
     const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {

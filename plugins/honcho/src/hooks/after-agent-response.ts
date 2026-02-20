@@ -4,16 +4,17 @@ import { getClaudeInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
 interface CursorHookInput {
-  conversation_id?: string;
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  text?: string;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  text?: string;
 }
 
 function isMeaningfulContent(content: string): boolean {

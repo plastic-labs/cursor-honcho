@@ -3,17 +3,20 @@ import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, 
 import { existsSync, readFileSync } from "fs";
 import { getClaudeInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
+import { outputStop, outputSystemMessage } from "../output.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  stop_hook_active?: boolean;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
   status?: string;
   loop_count?: number;
 }
@@ -113,13 +116,18 @@ export async function handleStop(): Promise<void> {
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
     const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
       hookInput = JSON.parse(input);
     }
   } catch {
+    process.exit(0);
+  }
+
+  // Claude Code: if stop_hook_active is true, we're in a continuation loop -- bail
+  if (hookInput.stop_hook_active) {
     process.exit(0);
   }
 
@@ -135,8 +143,7 @@ export async function handleStop(): Promise<void> {
 
   if (!lastMessage || !isMeaningfulContent(lastMessage)) {
     logHook("stop", `Skipping (no meaningful content)`);
-    // Output empty JSON - don't output followup_message to avoid auto-loops
-    console.log(JSON.stringify({}));
+    outputStop();
     process.exit(0);
   }
 
@@ -168,11 +175,11 @@ export async function handleStop(): Promise<void> {
     ]);
 
     logHook("stop", `Assistant response saved`);
+    outputStop(`[honcho] response \u2192 saved response (${lastMessage.length} chars)`);
   } catch (error) {
     logHook("stop", `Upload failed: ${error}`, { error: String(error) });
+    outputStop();
   }
 
-  // Output empty JSON - don't output followup_message to avoid auto-loops
-  console.log(JSON.stringify({}));
   process.exit(0);
 }

@@ -5,19 +5,21 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getHonchoClientOptions, getSessionName, setDetectedHost } from "../config.js";
+import { loadConfig, getHonchoClientOptions, getSessionName, detectHost, setDetectedHost } from "../config.js";
 
 const SETUP_MESSAGE = `Honcho is not configured. To enable persistent memory:
 
 1. Get a free API key at https://app.honcho.dev
 2. Add to your shell config (~/.zshrc or ~/.bashrc):
    export HONCHO_API_KEY="your-key-here"
-3. Restart Cursor
+3. Restart your editor
 
 Or run /honcho:setup for guided configuration.`;
 
 export async function runMcpServer(): Promise<void> {
-  setDetectedHost("cursor");
+  // Detect host from environment: Cursor sets CURSOR_PROJECT_DIR
+  const host = process.env.CURSOR_PROJECT_DIR ? "cursor" : "claude-code";
+  setDetectedHost(host);
   const config = loadConfig();
   const configured = config !== null;
 

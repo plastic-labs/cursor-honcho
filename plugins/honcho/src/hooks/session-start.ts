@@ -15,17 +15,21 @@ import { displayHonchoStartup } from "../pixel.js";
 import { captureGitState, getRecentCommits, isGitRepo, inferFeatureContext } from "../git.js";
 import { logHook, logApiCall, logCache, logFlow, logAsync, setLogContext } from "../log.js";
 import { verboseApiResult, verboseList, clearVerboseLog } from "../visual.js";
+import { outputSessionStart, outputSessionStartSetup } from "../output.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
+  // Shared fields
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;                  // Claude Code
+  // Cursor-specific
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
-  workspace_roots?: string[];
+  workspace_roots?: string[];    // Cursor
   user_email?: string;
-  transcript_path?: string;
   is_background_agent?: boolean;
   composer_mode?: string;
 }
@@ -49,15 +53,11 @@ Honcho is installed but not yet configured. To enable persistent memory:
    \`\`\`
    export HONCHO_API_KEY="your-key-here"
    \`\`\`
-3. Restart Cursor to pick up the new environment variable
+3. Restart your editor to pick up the new environment variable
 
 Or run \`/honcho:setup\` for guided configuration.`;
 
-    const output = {
-      additional_context: setupMessage,
-      user_message: "[honcho] Not configured -- run /honcho:setup or set HONCHO_API_KEY",
-    };
-    console.log(JSON.stringify(output));
+    outputSessionStartSetup(setupMessage, "[honcho] Not configured -- run /honcho:setup or set HONCHO_API_KEY");
     process.exit(0);
   }
 
@@ -65,7 +65,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
     const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
@@ -203,9 +203,9 @@ Or run \`/honcho:setup\` for guided configuration.`;
       contextParts.push(`## Git Activity Since Last Session\n${changeDescriptions}`);
     }
 
-    const localCursorContext = loadClaudeLocalContext();
-    if (localCursorContext) {
-      contextParts.push(`## Cursor Local Context (What I Was Working On)\n${localCursorContext.slice(0, 2000)}`);
+    const localContext = loadClaudeLocalContext();
+    if (localContext) {
+      contextParts.push(`## CLAUDE Local Context (What I Was Working On)\n${localContext.slice(0, 2000)}`);
     }
 
     // Context-aware dialectic queries
@@ -324,19 +324,19 @@ Or run \`/honcho:setup\` for guided configuration.`;
 
     logFlow("complete", `Memory loaded: ${contextParts.length} sections, ${successCount}/5 API calls succeeded`);
 
-    // Display pixel art only when stdout is a real TTY (Claude Code terminal, not Cursor hooks)
+    // Display pixel art only when stdout is a real TTY (terminal, not piped hooks)
     if (!isBackground && process.stdout.isTTY) {
       const { displayHonchoStartupTTY } = await import("../pixel.js");
       displayHonchoStartupTTY("Honcho Memory", "persistent context");
     }
 
-    // Output Cursor-format JSON
-    const memoryContext = `[${config.aiPeer}/Honcho Memory Loaded]\n\n${contextParts.join("\n\n")}`;
-    const output = {
-      additional_context: memoryContext,
-      user_message: `[honcho] Memory loaded: ${contextParts.length} sections, ${successCount}/5 sources`,
-    };
-    console.log(JSON.stringify(output));
+    // Output host-appropriate format
+    outputSessionStart({
+      memoryContext: contextParts.join("\n\n"),
+      statusLine: `[honcho] Memory loaded: ${contextParts.length} sections, ${successCount}/5 sources`,
+      aiPeer: config.aiPeer,
+      showPixelArt: !isBackground && !!process.stdout.isTTY,
+    });
     process.exit(0);
   } catch (error) {
     logHook("session-start", `Error: ${error}`, { error: String(error) });

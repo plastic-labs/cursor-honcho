@@ -57,6 +57,7 @@ export function getDetectedHost(): HonchoHost {
 
 export function detectHost(stdinInput?: Record<string, unknown>): HonchoHost {
   if (stdinInput?.cursor_version) return "cursor";
+  // Claude Code doesn't set cursor_version, and its hooks provide cwd/session_id
   return "claude-code";
 }
 
@@ -100,7 +101,7 @@ interface HonchoFileConfig {
 }
 
 /** Resolved runtime config consumed by all other code */
-export interface HonchoCursorConfig {
+export interface HonchoConfig {
   peerName: string;
   apiKey: string;
   workspace: string;
@@ -130,7 +131,7 @@ export function configExists(): boolean {
   return existsSync(CONFIG_FILE);
 }
 
-export function loadConfig(host?: HonchoHost): HonchoCursorConfig | null {
+export function loadConfig(host?: HonchoHost): HonchoConfig | null {
   const resolvedHost = host ?? getDetectedHost();
 
   if (configExists()) {
@@ -145,7 +146,7 @@ export function loadConfig(host?: HonchoHost): HonchoCursorConfig | null {
   return loadConfigFromEnv(resolvedHost);
 }
 
-function resolveConfig(raw: HonchoFileConfig, host: HonchoHost): HonchoCursorConfig | null {
+function resolveConfig(raw: HonchoFileConfig, host: HonchoHost): HonchoConfig | null {
   const apiKey = process.env.HONCHO_API_KEY || raw.apiKey;
   if (!apiKey) return null;
 
@@ -169,7 +170,7 @@ function resolveConfig(raw: HonchoFileConfig, host: HonchoHost): HonchoCursorCon
     }
   }
 
-  const config: HonchoCursorConfig = {
+  const config: HonchoConfig = {
     apiKey,
     peerName,
     workspace,
@@ -187,7 +188,7 @@ function resolveConfig(raw: HonchoFileConfig, host: HonchoHost): HonchoCursorCon
   return mergeWithEnvVars(config);
 }
 
-export function loadConfigFromEnv(host?: HonchoHost): HonchoCursorConfig | null {
+export function loadConfigFromEnv(host?: HonchoHost): HonchoConfig | null {
   const apiKey = process.env.HONCHO_API_KEY;
   if (!apiKey) {
     return null;
@@ -199,7 +200,7 @@ export function loadConfigFromEnv(host?: HonchoHost): HonchoCursorConfig | null 
   const aiPeer = process.env.HONCHO_AI_PEER || process.env.HONCHO_CURSOR_PEER || process.env.HONCHO_CLAUDE_PEER || resolvedHost;
   const endpoint = process.env.HONCHO_ENDPOINT;
 
-  const config: HonchoCursorConfig = {
+  const config: HonchoConfig = {
     apiKey,
     peerName,
     workspace,
@@ -220,7 +221,7 @@ export function loadConfigFromEnv(host?: HonchoHost): HonchoCursorConfig | null 
   return config;
 }
 
-function mergeWithEnvVars(config: HonchoCursorConfig): HonchoCursorConfig {
+function mergeWithEnvVars(config: HonchoConfig): HonchoConfig {
   // Only merge global (non-host-specific) env vars here.
   // workspace and aiPeer are host-specific — already resolved by the hosts
   // block in resolveConfig(). Generic env vars must not override them,
@@ -242,7 +243,7 @@ function mergeWithEnvVars(config: HonchoCursorConfig): HonchoCursorConfig {
 
 /** Read-merge-write: reads existing file, merges in changes, writes back.
  *  This prevents one surface from clobbering fields owned by the other. */
-export function saveConfig(config: HonchoCursorConfig): void {
+export function saveConfig(config: HonchoConfig): void {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
   }
@@ -288,12 +289,22 @@ export function saveConfig(config: HonchoCursorConfig): void {
   writeFileSync(CONFIG_FILE, JSON.stringify(existing, null, 2));
 }
 
-export function getCursorSettingsPath(): string {
-  return join(homedir(), ".cursor", "hooks.json");
+/** Get the settings path for the current host */
+export function getSettingsPath(host?: HonchoHost): string {
+  const h = host ?? getDetectedHost();
+  if (h === "cursor") {
+    return join(homedir(), ".cursor", "hooks.json");
+  }
+  return join(homedir(), ".claude", "settings.json");
 }
 
-export function getCursorSettingsDir(): string {
-  return join(homedir(), ".cursor");
+/** Get the settings directory for the current host */
+export function getSettingsDir(host?: HonchoHost): string {
+  const h = host ?? getDetectedHost();
+  if (h === "cursor") {
+    return join(homedir(), ".cursor");
+  }
+  return join(homedir(), ".claude");
 }
 
 export function getSessionForPath(cwd: string): string | null {
@@ -395,7 +406,7 @@ export interface HonchoClientOptions {
   workspaceId: string;
 }
 
-export function getHonchoBaseUrl(config: HonchoCursorConfig): string {
+export function getHonchoBaseUrl(config: HonchoConfig): string {
   if (config.endpoint?.baseUrl) {
     const url = config.endpoint.baseUrl;
     return url.endsWith("/v3") ? url : `${url}/v3`;
@@ -406,7 +417,7 @@ export function getHonchoBaseUrl(config: HonchoCursorConfig): string {
   return HONCHO_BASE_URLS.production;
 }
 
-export function getHonchoClientOptions(config: HonchoCursorConfig): HonchoClientOptions {
+export function getHonchoClientOptions(config: HonchoConfig): HonchoClientOptions {
   return {
     apiKey: config.apiKey,
     baseUrl: getHonchoBaseUrl(config),
@@ -414,7 +425,7 @@ export function getHonchoClientOptions(config: HonchoCursorConfig): HonchoClient
   };
 }
 
-export function getEndpointInfo(config: HonchoCursorConfig): { type: string; url: string } {
+export function getEndpointInfo(config: HonchoConfig): { type: string; url: string } {
   if (config.endpoint?.baseUrl) {
     return { type: "custom", url: config.endpoint.baseUrl };
   }

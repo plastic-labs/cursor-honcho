@@ -7,6 +7,7 @@ import {
   getConfigPath,
   getConfigDir,
   getHonchoClientOptions,
+  getDetectedHost,
   configExists,
 } from "../config.js";
 import * as s from "../styles.js";
@@ -24,7 +25,7 @@ async function setup(): Promise<void> {
     console.log("  1. Get a free key at https://app.honcho.dev");
     console.log("  2. Add to ~/.zshrc or ~/.bashrc:");
     console.log(s.dim('     export HONCHO_API_KEY="your-key-here"'));
-    console.log("  3. Restart Cursor");
+    console.log("  3. Restart your editor");
     process.exit(1);
   }
 
@@ -60,11 +61,12 @@ async function setup(): Promise<void> {
   // Write config if it doesn't exist
   if (!configExists()) {
     console.log(s.section("Creating config"));
+    const host = getDetectedHost();
     saveConfig({
       apiKey: config.apiKey,
       peerName: config.peerName,
-      workspace: "cursor",
-      aiPeer: "cursor",
+      workspace: host === "cursor" ? "cursor" : "claude-code",
+      aiPeer: host === "cursor" ? "cursor" : "clawd",
       saveMessages: true,
       enabled: true,
       logging: true,

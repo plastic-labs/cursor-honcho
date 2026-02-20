@@ -3,18 +3,21 @@ import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, 
 import { Spinner } from "../spinner.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 import { formatVerboseBlock, formatVerboseList } from "../visual.js";
+import { outputPreCompact } from "../output.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  trigger?: "manual" | "auto";
+  custom_instructions?: string;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  trigger?: "manual" | "auto";
   context_usage_percent?: number;
   context_tokens?: number;
   context_window_size?: number;
@@ -105,7 +108,7 @@ export async function handlePreCompact(): Promise<void> {
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
     const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
@@ -223,11 +226,9 @@ export async function handlePreCompact(): Promise<void> {
 
     logHook("pre-compact", `Memory anchored (${memoryCard.length} chars)`);
 
-    // Output Cursor-format JSON with the memory anchor as user_message
-    const output = {
-      user_message: `[${config.aiPeer}/Honcho Memory Anchor]\n\n${memoryCard}`,
-    };
-    console.log(JSON.stringify(output));
+    // Output host-appropriate format
+    const verboseOutput = verboseBlocks.filter(Boolean).join("\n");
+    outputPreCompact(config.aiPeer, memoryCard, verboseOutput || undefined);
     process.exit(0);
   } catch (error) {
     logHook("pre-compact", `Error: ${error}`, { error: String(error) });

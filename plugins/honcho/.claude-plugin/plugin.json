@@ -1,7 +1,7 @@
 {
   "name": "honcho",
   "version": "0.1.0",
-  "description": "Persistent memory for Cursor sessions using Honcho by Plastic Labs",
+  "description": "Persistent memory for Claude Code sessions using Honcho by Plastic Labs",
   "author": {
     "name": "Plastic Labs",
     "email": "hello@plasticlabs.ai"
@@ -9,9 +9,9 @@
   "homepage": "https://honcho.dev",
   "repository": "https://github.com/plastic-labs/cursor-honcho",
   "license": "MIT",
-  "keywords": ["memory", "context", "ai", "honcho", "persistence", "cursor"],
+  "keywords": ["memory", "context", "ai", "honcho", "persistence", "claude-code"],
   "logo": "assets/logo.svg",
-  "hooks": "./hooks/hooks.json",
+  "hooks": "./hooks/claude-hooks.json",
   "mcpServers": "./mcp.json",
   "skills": "./skills/",
   "rules": "./rules/",
