@@ -185,7 +185,7 @@ Honcho stores persistent config at `~/.honcho/config.json`. This is created auto
       "aiPeer": "cursor"
     },
     "claude-code": {
-      "workspace": "claude-code",
+      "workspace": "claude_code",
       "aiPeer": "clawd"
     }
   }
