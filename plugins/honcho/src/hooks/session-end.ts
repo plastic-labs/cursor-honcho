@@ -4,10 +4,10 @@ import { existsSync, readFileSync } from "fs";
 import {
   getQueuedMessages,
   markMessagesUploaded,
-  generateClaudeSummary,
-  saveClaudeLocalContext,
-  loadClaudeLocalContext,
-  getClaudeInstanceId,
+  generateSessionSummary,
+  saveLocalWorkContext,
+  loadLocalWorkContext,
+  getInstanceId,
   chunkContent,
 } from "../cache.js";
 import { playCooldown } from "../spinner.js";
@@ -235,7 +235,7 @@ export async function handleSessionEnd(): Promise<void> {
     // Step 1: Upload queued user messages (backup for failed fire-and-forget)
     // Only upload messages for THIS session (by cwd), not other sessions
     // =====================================================
-    const instanceId = getClaudeInstanceId();
+    const instanceId = getInstanceId();
     const queuedMessages = getQueuedMessages(cwd);
     logHook("session-end", `Processing ${queuedMessages.length} queued messages`);
     if (queuedMessages.length > 0) {
@@ -288,6 +288,7 @@ export async function handleSessionEnd(): Promise<void> {
             aiPeer.message(chunk, {
               metadata: {
                 instance_id: instanceId || undefined,
+                model: hookInput.model,
                 type: msg.isMeaningful ? 'assistant_prose' : 'assistant_brief',
                 meaningful: msg.isMeaningful || false,
                 session_affinity: sessionName,
@@ -305,7 +306,7 @@ export async function handleSessionEnd(): Promise<void> {
     // Step 3: Generate and save cursor self-summary
     // =====================================================
     const workItems = extractWorkItems(assistantMessages.map((m) => m.content));
-    const existingContext = loadClaudeLocalContext();
+    const existingContext = loadLocalWorkContext();
 
     // Preserve recent activity from existing context
     let recentActivity = "";
@@ -316,14 +317,14 @@ export async function handleSessionEnd(): Promise<void> {
       }
     }
 
-    const newSummary = generateClaudeSummary(
+    const newSummary = generateSessionSummary(
       sessionName,
       workItems,
       assistantMessages.map((m) => m.content)
     );
 
     // Append preserved activity
-    saveClaudeLocalContext(newSummary + recentActivity);
+    saveLocalWorkContext(newSummary + recentActivity);
 
     // =====================================================
     // Step 4: Log session end marker
@@ -334,6 +335,7 @@ export async function handleSessionEnd(): Promise<void> {
         {
           metadata: {
             instance_id: instanceId || undefined,
+            model: hookInput.model,
             session_affinity: sessionName,
           },
         }
