@@ -38,7 +38,7 @@ const HONCHO_BASE_URLS = {
 // Host Detection
 // ============================================
 
-export type HonchoHost = "cursor" | "claude-code";
+export type HonchoHost = "cursor" | "claude_code";
 
 export interface HostConfig {
   workspace?: string;
@@ -58,17 +58,17 @@ export function getDetectedHost(): HonchoHost {
 export function detectHost(stdinInput?: Record<string, unknown>): HonchoHost {
   if (stdinInput?.cursor_version) return "cursor";
   // Claude Code doesn't set cursor_version, and its hooks provide cwd/session_id
-  return "claude-code";
+  return "claude_code";
 }
 
 const DEFAULT_WORKSPACE: Record<HonchoHost, string> = {
   "cursor": "cursor",
-  "claude-code": "claude_code",
+  "claude_code": "claude_code",
 };
 
 const DEFAULT_AI_PEER: Record<HonchoHost, string> = {
   "cursor": "cursor",
-  "claude-code": "clawd",
+  "claude_code": "clawd",
 };
 
 // Stdin cache: entry points read stdin once, handlers consume from cache

@@ -18,7 +18,7 @@ Or run /honcho:setup for guided configuration.`;
 
 export async function runMcpServer(): Promise<void> {
   // Detect host from environment: Cursor sets CURSOR_PROJECT_DIR
-  const host = process.env.CURSOR_PROJECT_DIR ? "cursor" : "claude-code";
+  const host = process.env.CURSOR_PROJECT_DIR ? "cursor" : "claude_code";
   setDetectedHost(host);
   const config = loadConfig();
   const configured = config !== null;
