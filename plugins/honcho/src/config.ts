@@ -34,11 +34,83 @@ const HONCHO_BASE_URLS = {
   local: "http://localhost:8000/v3",
 } as const;
 
-export interface HonchoCursorConfig {
+// ============================================
+// Host Detection
+// ============================================
+
+export type HonchoHost = "cursor" | "claude_code";
+
+export interface HostConfig {
+  workspace?: string;
+  aiPeer?: string;
+}
+
+let _detectedHost: HonchoHost | null = null;
+
+export function setDetectedHost(host: HonchoHost): void {
+  _detectedHost = host;
+}
+
+export function getDetectedHost(): HonchoHost {
+  return _detectedHost ?? "cursor";
+}
+
+export function detectHost(stdinInput?: Record<string, unknown>): HonchoHost {
+  if (stdinInput?.cursor_version) return "cursor";
+  // Claude Code doesn't set cursor_version, and its hooks provide cwd/session_id
+  return "claude_code";
+}
+
+const DEFAULT_WORKSPACE: Record<HonchoHost, string> = {
+  "cursor": "cursor",
+  "claude_code": "claude_code",
+};
+
+const DEFAULT_AI_PEER: Record<HonchoHost, string> = {
+  "cursor": "cursor",
+  "claude_code": "clawd",
+};
+
+// Stdin cache: entry points read stdin once, handlers consume from cache
+let _stdinText: string | null = null;
+
+export function cacheStdin(text: string): void {
+  _stdinText = text;
+}
+
+export function getCachedStdin(): string | null {
+  return _stdinText;
+}
+
+// ============================================
+// Config Types
+// ============================================
+
+/** Raw shape of ~/.honcho/config.json on disk */
+interface HonchoFileConfig {
+  apiKey?: string;
+  peerName?: string;
+  workspace?: string;
+  sessions?: Record<string, string>;
+  saveMessages?: boolean;
+  messageUpload?: MessageUploadConfig;
+  contextRefresh?: ContextRefreshConfig;
+  endpoint?: HonchoEndpointConfig;
+  localContext?: LocalContextConfig;
+  enabled?: boolean;
+  logging?: boolean;
+  hosts?: Record<string, HostConfig>;
+  // Legacy flat fields (read-only fallbacks)
+  cursorPeer?: string;
+  claudePeer?: string;
+}
+
+/** Resolved runtime config consumed by all other code */
+export interface HonchoConfig {
   peerName: string;
   apiKey: string;
   workspace: string;
-  cursorPeer: string;
+  aiPeer: string;
   sessions?: Record<string, string>;
   saveMessages?: boolean;
   messageUpload?: MessageUploadConfig;
@@ -64,37 +136,83 @@ export function configExists(): boolean {
   return existsSync(CONFIG_FILE);
 }
 
-export function loadConfig(): HonchoCursorConfig | null {
+export function loadConfig(host?: HonchoHost): HonchoConfig | null {
+  const resolvedHost = host ?? getDetectedHost();
+
   if (configExists()) {
     try {
       const content = readFileSync(CONFIG_FILE, "utf-8");
-      const raw = JSON.parse(content);
-      // Ignore claudePeer from shared config -- Cursor gets its own peer identity
-      const fileConfig = raw as HonchoCursorConfig;
-      return mergeWithEnvVars(fileConfig);
+      const raw = JSON.parse(content) as HonchoFileConfig;
+      return resolveConfig(raw, resolvedHost);
     } catch {
       // Fall through to env-only config
     }
   }
-  return loadConfigFromEnv();
+  return loadConfigFromEnv(resolvedHost);
 }
 
-export function loadConfigFromEnv(): HonchoCursorConfig | null {
+function resolveConfig(raw: HonchoFileConfig, host: HonchoHost): HonchoConfig | null {
+  const apiKey = process.env.HONCHO_API_KEY || raw.apiKey;
+  if (!apiKey) return null;
+
+  const peerName = raw.peerName || process.env.HONCHO_PEER_NAME || process.env.USER || "user";
+
+  // Resolve host-specific fields
+  let workspace: string;
+  let aiPeer: string;
+
+  const hostBlock = raw.hosts?.[host];
+  if (hostBlock) {
+    workspace = hostBlock.workspace ?? DEFAULT_WORKSPACE[host];
+    aiPeer = hostBlock.aiPeer ?? DEFAULT_AI_PEER[host];
+  } else {
+    // Legacy fallback
+    workspace = raw.workspace ?? DEFAULT_WORKSPACE[host];
+    if (host === "cursor") {
+      aiPeer = raw.cursorPeer ?? "cursor";
+    } else {
+      aiPeer = raw.claudePeer ?? "clawd";
+    }
+  }
+
+  const config: HonchoConfig = {
+    apiKey,
+    peerName,
+    workspace,
+    aiPeer,
+    sessions: raw.sessions,
+    saveMessages: raw.saveMessages,
+    messageUpload: raw.messageUpload,
+    contextRefresh: raw.contextRefresh,
+    endpoint: raw.endpoint,
+    localContext: raw.localContext,
+    enabled: raw.enabled,
+    logging: raw.logging,
+  };
+
+  return mergeWithEnvVars(config);
+}
+
+export function loadConfigFromEnv(host?: HonchoHost): HonchoConfig | null {
   const apiKey = process.env.HONCHO_API_KEY;
   if (!apiKey) {
     return null;
   }
 
+  const resolvedHost = host ?? getDetectedHost();
   const peerName = process.env.HONCHO_PEER_NAME || process.env.USER || "user";
-  const workspace = process.env.HONCHO_WORKSPACE || "cursor";
-  const cursorPeer = process.env.HONCHO_CURSOR_PEER || "cursor";
+  const workspace = process.env.HONCHO_WORKSPACE || DEFAULT_WORKSPACE[resolvedHost];
+  const hostPeerEnv = resolvedHost === "cursor"
+    ? process.env.HONCHO_CURSOR_PEER
+    : process.env.HONCHO_CLAUDE_PEER;
+  const aiPeer = process.env.HONCHO_AI_PEER || hostPeerEnv || DEFAULT_AI_PEER[resolvedHost];
   const endpoint = process.env.HONCHO_ENDPOINT;
 
-  const config: HonchoCursorConfig = {
+  const config: HonchoConfig = {
     apiKey,
     peerName,
     workspace,
-    cursorPeer,
+    aiPeer,
     saveMessages: process.env.HONCHO_SAVE_MESSAGES !== "false",
     enabled: process.env.HONCHO_ENABLED !== "false",
     logging: process.env.HONCHO_LOGGING !== "false",
@@ -111,22 +229,16 @@ export function loadConfigFromEnv(): HonchoCursorConfig | null {
   return config;
 }
 
-function mergeWithEnvVars(config: HonchoCursorConfig): HonchoCursorConfig {
+function mergeWithEnvVars(config: HonchoConfig): HonchoConfig {
+  // Only merge global (non-host-specific) env vars here.
+  // workspace and aiPeer are host-specific — already resolved by the hosts
+  // block in resolveConfig(). Generic env vars must not override them,
+  // otherwise HONCHO_WORKSPACE set for one host clobbers the other.
   if (process.env.HONCHO_API_KEY) {
     config.apiKey = process.env.HONCHO_API_KEY;
   }
-  if (process.env.HONCHO_WORKSPACE) {
-    config.workspace = process.env.HONCHO_WORKSPACE;
-  }
   if (process.env.HONCHO_PEER_NAME) {
     config.peerName = process.env.HONCHO_PEER_NAME;
-  }
-  if (process.env.HONCHO_CURSOR_PEER) {
-    config.cursorPeer = process.env.HONCHO_CURSOR_PEER;
-  }
-  // Default to "cursor" -- never inherit HONCHO_CLAUDE_PEER
-  if (!config.cursorPeer) {
-    config.cursorPeer = "cursor";
   }
   if (process.env.HONCHO_ENABLED === "false") {
     config.enabled = false;
@@ -137,19 +249,70 @@ function mergeWithEnvVars(config: HonchoCursorConfig): HonchoCursorConfig {
   return config;
 }
 
-export function saveConfig(config: HonchoCursorConfig): void {
+/** Read-merge-write: reads existing file, merges in changes, writes back.
+ *  This prevents one surface from clobbering fields owned by the other. */
+export function saveConfig(config: HonchoConfig): void {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
   }
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+
+  let existing: HonchoFileConfig = {};
+  if (existsSync(CONFIG_FILE)) {
+    try {
+      existing = JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
+    } catch {
+      // Start fresh if corrupt
+    }
+  }
+
+  // Merge shared fields
+  existing.apiKey = config.apiKey;
+  existing.peerName = config.peerName;
+  existing.sessions = config.sessions;
+  existing.saveMessages = config.saveMessages;
+  existing.messageUpload = config.messageUpload;
+  existing.contextRefresh = config.contextRefresh;
+  existing.endpoint = config.endpoint;
+  existing.localContext = config.localContext;
+  existing.enabled = config.enabled;
+  existing.logging = config.logging;
+
+  // Write host-specific fields into hosts block
+  const host = getDetectedHost();
+  if (!existing.hosts) existing.hosts = {};
+  existing.hosts[host] = {
+    workspace: config.workspace,
+    aiPeer: config.aiPeer,
+  };
+
+  // Keep legacy flat fields for backwards compatibility with old code
+  // that hasn't been updated to read from hosts block yet
+  existing.workspace = config.workspace;
+  if (host === "cursor") {
+    existing.cursorPeer = config.aiPeer;
+  } else {
+    existing.claudePeer = config.aiPeer;
+  }
+
+  writeFileSync(CONFIG_FILE, JSON.stringify(existing, null, 2));
 }
 
-export function getCursorSettingsPath(): string {
-  return join(homedir(), ".cursor", "hooks.json");
+/** Get the settings path for the current host */
+export function getSettingsPath(host?: HonchoHost): string {
+  const h = host ?? getDetectedHost();
+  if (h === "cursor") {
+    return join(homedir(), ".cursor", "hooks.json");
+  }
+  return join(homedir(), ".claude", "settings.json");
 }
 
-export function getCursorSettingsDir(): string {
-  return join(homedir(), ".cursor");
+/** Get the settings directory for the current host */
+export function getSettingsDir(host?: HonchoHost): string {
+  const h = host ?? getDetectedHost();
+  if (h === "cursor") {
+    return join(homedir(), ".cursor");
+  }
+  return join(homedir(), ".claude");
 }
 
 export function getSessionForPath(cwd: string): string | null {
@@ -251,7 +414,7 @@ export interface HonchoClientOptions {
   workspaceId: string;
 }
 
-export function getHonchoBaseUrl(config: HonchoCursorConfig): string {
+export function getHonchoBaseUrl(config: HonchoConfig): string {
   if (config.endpoint?.baseUrl) {
     const url = config.endpoint.baseUrl;
     return url.endsWith("/v3") ? url : `${url}/v3`;
@@ -262,7 +425,7 @@ export function getHonchoBaseUrl(config: HonchoCursorConfig): string {
   return HONCHO_BASE_URLS.production;
 }
 
-export function getHonchoClientOptions(config: HonchoCursorConfig): HonchoClientOptions {
+export function getHonchoClientOptions(config: HonchoConfig): HonchoClientOptions {
   return {
     apiKey: config.apiKey,
     baseUrl: getHonchoBaseUrl(config),
@@ -270,7 +433,7 @@ export function getHonchoClientOptions(config: HonchoCursorConfig): HonchoClient
   };
 }
 
-export function getEndpointInfo(config: HonchoCursorConfig): { type: string; url: string } {
+export function getEndpointInfo(config: HonchoConfig): { type: string; url: string } {
   if (config.endpoint?.baseUrl) {
     return { type: "custom", url: config.endpoint.baseUrl };
   }

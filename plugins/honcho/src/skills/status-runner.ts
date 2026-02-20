@@ -4,7 +4,7 @@ import {
   getConfigPath,
   getEndpointInfo,
   isPluginEnabled,
-  getCursorSettingsPath,
+  getDetectedHost,
 } from "../config.js";
 import { checkHooksInstalled, verifyCommandAvailable } from "../install.js";
 import { loadIdCache, loadContextCache, getInstanceId } from "../cache.js";
@@ -25,14 +25,14 @@ function status(): void {
   const enabled = isPluginEnabled();
   console.log(s.section("Plugin Status"));
   console.log(`  ${s.label("Status")}:        ${enabled ? s.success("enabled") : s.warn("disabled")}`);
-  console.log(`  ${s.label("Platform")}:      Cursor`);
+  console.log(`  ${s.label("Platform")}:      ${getDetectedHost()}`);
   console.log("");
 
   console.log(s.section("Configuration"));
   console.log(s.dim(getConfigPath()));
   console.log("");
   console.log(`  ${s.label("Peer name")}:     ${config.peerName}`);
-  console.log(`  ${s.label("Cursor peer")}:   ${config.cursorPeer}`);
+  console.log(`  ${s.label("AI peer")}:       ${config.aiPeer}`);
   console.log(`  ${s.label("Workspace")}:     ${config.workspace}`);
   console.log(`  ${s.label("Save messages")}: ${config.saveMessages !== false ? "enabled" : "disabled"}`);
   console.log(`  ${s.label("API key")}:       ${s.dim(config.apiKey.slice(0, 20) + "...")}`);

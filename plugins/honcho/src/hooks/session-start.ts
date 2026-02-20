@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, setSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionForPath, setSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import {
   setCachedUserContext,
   setCachedAIContext,
@@ -15,17 +15,21 @@ import { displayHonchoStartup } from "../pixel.js";
 import { captureGitState, getRecentCommits, isGitRepo, inferFeatureContext } from "../git.js";
 import { logHook, logApiCall, logCache, logFlow, logAsync, setLogContext } from "../log.js";
 import { verboseApiResult, verboseList, clearVerboseLog } from "../visual.js";
+import { outputSessionStart, outputSessionStartSetup } from "../output.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
+  // Shared fields
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;                  // Claude Code
+  // Cursor-specific
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
-  workspace_roots?: string[];
+  workspace_roots?: string[];    // Cursor
   user_email?: string;
-  transcript_path?: string;
   is_background_agent?: boolean;
   composer_mode?: string;
 }
@@ -40,17 +44,30 @@ function formatRepresentation(rep: any): string {
 export async function handleSessionStart(): Promise<void> {
   const config = loadConfig();
   if (!config) {
-    console.error("[honcho] Not configured. Set HONCHO_API_KEY environment variable.");
-    process.exit(1);
+    const setupMessage = `## Honcho Memory -- Setup Required
+
+Honcho is installed but not yet configured. To enable persistent memory:
+
+1. Get a free API key at https://app.honcho.dev
+2. Add it to your shell config (~/.zshrc or ~/.bashrc):
+   \`\`\`
+   export HONCHO_API_KEY="your-key-here"
+   \`\`\`
+3. Restart your editor to pick up the new environment variable
+
+Or run \`/honcho:setup\` for guided configuration.`;
+
+    outputSessionStartSetup(setupMessage, "[honcho] Not configured -- run /honcho:setup or set HONCHO_API_KEY");
+    process.exit(0);
   }
 
   if (!isPluginEnabled()) {
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
       hookInput = JSON.parse(input);
     }
@@ -58,7 +75,7 @@ export async function handleSessionStart(): Promise<void> {
     // No input or invalid JSON
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const cursorInstanceId = hookInput.conversation_id || hookInput.session_id;
   const isBackground = hookInput.is_background_agent || false;
 
@@ -82,31 +99,32 @@ export async function handleSessionStart(): Promise<void> {
     setCachedGitState(cwd, currentGitState);
   }
 
-  // Start loading animation (skip for background agents)
+  // Start loading animation (skip for background agents and non-TTY like Cursor hooks)
+  const isTTY = process.stderr.isTTY;
   const spinner = new Spinner({ style: "neural" });
-  if (!isBackground) {
+  if (!isBackground && isTTY) {
     spinner.start("loading memory");
   }
 
   try {
     logHook("session-start", `Starting session in ${cwd}`, { branch: currentGitState?.branch });
-    logFlow("init", `workspace: ${config.workspace}, peers: ${config.peerName}/${config.cursorPeer}`);
+    logFlow("init", `workspace: ${config.workspace}, peers: ${config.peerName}/${config.aiPeer}`);
 
     const honcho = new Honcho(getHonchoClientOptions(config));
 
-    if (!isBackground) spinner.update("Loading session");
+    if (!isBackground && isTTY) spinner.update("Loading session");
 
-    const [session, userPeer, cursorPeerObj] = await Promise.all([
+    const [session, userPeer, aiPeerObj] = await Promise.all([
       honcho.session(sessionName),
       honcho.peer(config.peerName),
-      honcho.peer(config.cursorPeer),
+      honcho.peer(config.aiPeer),
     ]);
     logApiCall("honcho.session/peer", "GET", `session + 2 peers`, Date.now(), true);
 
     // Set peer observation config (fire-and-forget)
     Promise.all([
       session.setPeerConfiguration(userPeer, { observeMe: true, observeOthers: false }),
-      session.setPeerConfiguration(cursorPeerObj, { observeMe: false, observeOthers: true }),
+      session.setPeerConfiguration(aiPeerObj, { observeMe: false, observeOthers: true }),
     ]).catch((e) => logHook("session-start", `Set peers failed: ${e}`));
 
     if (!getSessionForPath(cwd)) {
@@ -136,13 +154,13 @@ export async function handleSessionStart(): Promise<void> {
     }
 
     // Parallel context fetch
-    if (!isBackground) spinner.update("Fetching memory context");
+    if (!isBackground && isTTY) spinner.update("Fetching memory context");
     logAsync("context-fetch", "Starting 5 parallel context fetches");
     const contextParts: string[] = [];
 
     let headerContent = `## Honcho Memory System Active
 - User: ${config.peerName}
-- AI: ${config.cursorPeer}
+- AI: ${config.aiPeer}
 - Workspace: ${config.workspace}
 - Session: ${sessionName}
 - Directory: ${cwd}`;
@@ -185,9 +203,9 @@ export async function handleSessionStart(): Promise<void> {
       contextParts.push(`## Git Activity Since Last Session\n${changeDescriptions}`);
     }
 
-    const localCursorContext = loadLocalWorkContext();
-    if (localCursorContext) {
-      contextParts.push(`## CURSOR Local Context (What I Was Working On)\n${localCursorContext.slice(0, 2000)}`);
+    const localContext = loadLocalWorkContext();
+    if (localContext) {
+      contextParts.push(`## Local Context (What I Was Working On)\n${localContext.slice(0, 2000)}`);
     }
 
     // Context-aware dialectic queries
@@ -203,14 +221,14 @@ export async function handleSessionStart(): Promise<void> {
     const [userContextResult, cursorContextResult, summariesResult, userChatResult, cursorChatResult] =
       await Promise.allSettled([
         userPeer.context({ maxConclusions: 25, includeMostFrequent: true }),
-        cursorPeerObj.context({ maxConclusions: 15, includeMostFrequent: true }),
+        aiPeerObj.context({ maxConclusions: 15, includeMostFrequent: true }),
         session.summaries(),
         userPeer.chat(
           `Summarize what you know about ${config.peerName} in 2-3 sentences. Focus on their preferences, current projects, and working style.${branchContext}${changeContext}${featureHint}`,
           { session }
         ),
-        cursorPeerObj.chat(
-          `What has ${config.cursorPeer} been working on recently?${branchContext}${featureHint} Summarize the AI assistant's recent activities and focus areas relevant to the current work context.`,
+        aiPeerObj.chat(
+          `What has ${config.aiPeer} been working on recently?${branchContext}${featureHint} Summarize the AI assistant's recent activities and focus areas relevant to the current work context.`,
           { session }
         ),
       ]);
@@ -246,7 +264,7 @@ export async function handleSessionStart(): Promise<void> {
     }
     if (cursorChatResult.status === "fulfilled") {
       const chatVal = typeof cursorChatResult.value === "string" ? cursorChatResult.value : (cursorChatResult.value as any)?.content;
-      verboseApiResult(`peer.chat(cursor) -> "${config.cursorPeer}"`, chatVal);
+      verboseApiResult(`peer.chat(cursor) -> "${config.aiPeer}"`, chatVal);
     }
 
     // Build context sections
@@ -275,7 +293,7 @@ export async function handleSessionStart(): Promise<void> {
       if (rep) {
         const repText = formatRepresentation(rep);
         if (repText) {
-          contextParts.push(`## ${config.cursorPeer}'s Work History (Self-Context)\n${repText}`);
+          contextParts.push(`## ${config.aiPeer}'s Work History (Self-Context)\n${repText}`);
         }
       }
     }
@@ -299,30 +317,30 @@ export async function handleSessionStart(): Promise<void> {
       ? (typeof cursorChatResult.value === "string" ? cursorChatResult.value : (cursorChatResult.value as any)?.content)
       : null;
     if (cursorChatContent) {
-      contextParts.push(`## AI Self-Reflection (What ${config.cursorPeer} Has Been Doing)\n${cursorChatContent}`);
+      contextParts.push(`## AI Self-Reflection (What ${config.aiPeer} Has Been Doing)\n${cursorChatContent}`);
     }
 
-    if (!isBackground) spinner.stop();
+    if (!isBackground && isTTY) spinner.stop();
 
     logFlow("complete", `Memory loaded: ${contextParts.length} sections, ${successCount}/5 API calls succeeded`);
 
-    // Display pixel art to TTY
-    if (!isBackground) {
+    // Display pixel art only when stdout is a real TTY (terminal, not piped hooks)
+    if (!isBackground && process.stdout.isTTY) {
       const { displayHonchoStartupTTY } = await import("../pixel.js");
       displayHonchoStartupTTY("Honcho Memory", "persistent context");
     }
 
-    // Output Cursor-format JSON
-    const memoryContext = `[${config.cursorPeer}/Honcho Memory Loaded]\n\n${contextParts.join("\n\n")}`;
-    const output = {
-      additional_context: memoryContext,
-      user_message: `[honcho] Memory loaded: ${contextParts.length} sections, ${successCount}/5 sources`,
-    };
-    console.log(JSON.stringify(output));
+    // Output host-appropriate format
+    outputSessionStart({
+      memoryContext: contextParts.join("\n\n"),
+      statusLine: `[honcho] Memory loaded: ${contextParts.length} sections, ${successCount}/5 sources`,
+      aiPeer: config.aiPeer,
+      showPixelArt: !isBackground && !!process.stdout.isTTY,
+    });
     process.exit(0);
   } catch (error) {
     logHook("session-start", `Error: ${error}`, { error: String(error) });
-    if (!isBackground) spinner.fail("memory load failed");
+    if (!isBackground && isTTY) spinner.fail("memory load failed");
     console.error(`[honcho] ${error}`);
     process.exit(1);
   }

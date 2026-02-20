@@ -1,20 +1,21 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { getInstanceId } from "../cache.js";
 import { logHook, setLogContext } from "../log.js";
 
 interface CursorHookInput {
-  conversation_id?: string;
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  text?: string;
+  duration_ms?: number;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  text?: string;
-  duration_ms?: number;
 }
 
 export async function handleAfterAgentThought(): Promise<void> {
@@ -25,13 +26,13 @@ export async function handleAfterAgentThought(): Promise<void> {
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) hookInput = JSON.parse(input);
   } catch {
     process.exit(0);
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const text = hookInput.text || "";
   const durationMs = hookInput.duration_ms;
 
@@ -48,17 +49,16 @@ export async function handleAfterAgentThought(): Promise<void> {
     const honcho = new Honcho(getHonchoClientOptions(config));
     const sessionName = getSessionName(cwd);
     const session = await honcho.session(sessionName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
     const instanceId = getInstanceId();
 
     // Truncate to avoid API limits but keep the valuable reasoning
     const truncated = text.length > 4000 ? text.slice(0, 4000) + "..." : text;
 
     await session.addMessages([
-      cursorPeer.message(`[Reasoning] ${truncated}`, {
+      aiPeer.message(`[Reasoning] ${truncated}`, {
         metadata: {
           instance_id: instanceId || undefined,
-          model: hookInput.model,
           type: "agent_thought",
           duration_ms: durationMs,
           session_affinity: sessionName,

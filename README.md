@@ -1,15 +1,13 @@
-<p align="center">
-  <img src="assets/banner.png" alt="Honcho x Cursor" width="100%" />
-</p>
-
-# Honcho Plugins for Cursor
+# Honcho Plugins
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Honcho](https://img.shields.io/badge/Honcho-Memory%20API-blue)](https://honcho.dev)
 
-A plugin marketplace for [Cursor](https://cursor.com), powered by [Honcho](https://honcho.dev) from Plastic Labs.
+![Honcho x Cursor](assets/banner.png)
 
-Give Cursor persistent memory that survives context wipes, session restarts, and tab closures. Your AI assistant remembers what you're working on, your preferences, and what it was doing -- across all your projects.
+Give [Cursor](https://cursor.com) and [Claude Code](https://github.com/plastic-labs/claude-honcho) persistent memory powered by [Honcho](https://honcho.dev). Your AI assistant remembers what you're working on, your preferences, and what it was doing -- across context wipes, session restarts, and tab closures.
+
+> **Claude Code users**: See [claude-honcho](https://github.com/plastic-labs/claude-honcho) for Claude Code-specific installation. The underlying plugin codebase is shared and host-aware.
 
 ## Plugins
 
@@ -22,63 +20,35 @@ Give Cursor persistent memory that survives context wipes, session restarts, and
 
 # `honcho` Plugin
 
-**Persistent memory for Cursor using [Honcho](https://honcho.dev).**
-
 ## Prerequisites
 
-**Bun** is required. Install it with:
+1. **Bun** -- install with `curl -fsSL https://bun.sh/install | bash`
+2. **Honcho API key** -- free at [app.honcho.dev](https://app.honcho.dev)
+
+## Setup
+
+### 1. Set your API key
+
+Add to your shell config (`~/.zshrc` or `~/.bashrc`):
 
 ```bash
-curl -fsSL https://bun.sh/install | bash
+export HONCHO_API_KEY="hch-your-key-here"
 ```
 
-## Quick Start
+Reload: `source ~/.zshrc`
 
-### Step 1: Get Your Honcho API Key
-
-1. Go to **[app.honcho.dev](https://app.honcho.dev)**
-2. Sign up or log in
-3. Copy your API key (starts with `hch-`)
-
-### Step 2: Set Environment Variables
-
-Add to your shell config (`~/.zshrc`, `~/.bashrc`, or `~/.profile`):
+### 2. Install dependencies
 
 ```bash
-# Required
-export HONCHO_API_KEY="hch-your-api-key-here"
-
-# Optional (defaults shown)
-export HONCHO_PEER_NAME="$USER"           # Your name/identity
-export HONCHO_WORKSPACE="cursor"          # Workspace name
-export HONCHO_CURSOR_PEER="cursor"        # How the AI is identified
-```
-
-Then reload your shell:
-
-```bash
-source ~/.zshrc
-```
-
-### Step 3: Install
-
-#### From the Cursor Marketplace
-
-Search for **Honcho Memory** in the [Cursor Marketplace](https://cursor.com/marketplace) and click **Add to Cursor**.
-
-#### Manual Install (from GitHub)
-
-Clone the repo and install dependencies:
-
-```bash
-git clone https://github.com/plastic-labs/cursor-honcho.git
-cd cursor-honcho/plugins/honcho
+cd /path/to/cursor-honcho/plugins/honcho
 bun install
 ```
 
-Then add Honcho to any project by creating a `.cursor/` directory with three config files:
+### 3. Configure your project
 
-**`.cursor/hooks.json`** -- registers all lifecycle hooks:
+In any project where you want Honcho memory, create a `.cursor/` directory with three things:
+
+**`.cursor/hooks.json`** -- registers all 9 lifecycle hooks:
 
 ```json
 {
@@ -118,9 +88,9 @@ Then add Honcho to any project by creating a `.cursor/` directory with three con
 }
 ```
 
-Replace `/path/to/cursor-honcho` with the absolute path where you cloned the repo.
+Replace `/path/to/cursor-honcho` with the actual absolute path to this repo on your machine.
 
-**`.cursor/mcp.json`** -- connects the MCP server:
+**`.cursor/mcp.json`** -- connects the MCP server for mid-conversation memory tools:
 
 ```json
 {
@@ -133,51 +103,43 @@ Replace `/path/to/cursor-honcho` with the absolute path where you cloned the rep
 }
 ```
 
-**`.cursor/rules/honcho-memory.mdc`** -- copy or symlink the rule:
+**`.cursor/rules/honcho-memory.mdc`** -- the always-on memory rule:
 
 ```bash
-mkdir -p .cursor/rules
 cp /path/to/cursor-honcho/plugins/honcho/rules/honcho-memory.mdc .cursor/rules/
 ```
 
-Restart Cursor. Memory loads automatically on the next chat.
+### 4. Open Cursor from the terminal
 
-### Step 4: (Optional) Interview
+Launch Cursor from a terminal so it inherits `HONCHO_API_KEY`:
 
-Tell the AI:
+```bash
+cursor /path/to/your-project
+```
 
-> Run the honcho interview
+Open a new chat. If everything is configured, Honcho will inject memory context at session start.
 
-Cursor will interview you about your preferences to kickstart your profile.
+### 5. Verify
+
+- Open a new chat and check if the AI knows your name/preferences
+- Run `/honcho:status` to see the connection status
+- Run `/honcho:setup` for guided configuration if something isn't working
 
 ## Features
 
+### Cross-Session Memory
+
+Context about you, your preferences, and past work loads automatically at the start of every session. No re-explaining.
+
 ### Subagent Memory
 
-Cursor's subagent system gets automatic memory capture. When subagents complete work, their results are saved to Honcho. This means delegated research, code analysis, and background tasks all contribute to your persistent memory.
+When Cursor's subagents complete work, their results are saved to Honcho. Delegated research, code analysis, and background tasks all contribute to persistent memory.
 
 ### Deep Reasoning Capture
 
-The `afterAgentThought` hook captures substantial AI reasoning (extended thinking blocks). When the AI does deep analysis, the insights are preserved in Honcho for future sessions.
+The `afterAgentThought` hook captures substantial AI reasoning (extended thinking blocks). When the AI does deep analysis, the insights are preserved for future sessions.
 
-### Memory Analyst Subagent
-
-A custom `memory-analyst` subagent can perform deep Honcho queries on demand. The main agent can delegate complex memory lookups to it.
-
-### Quick Commands
-
-| Command | Description |
-|---------|-------------|
-| `/recall [topic]` | Search memory for something specific |
-| `/remember [fact]` | Save something to persistent memory |
-| `/honcho:interview` | Interview to capture preferences |
-| `/honcho:status` | Show memory system status |
-
-### Always-On Memory Rule
-
-An always-applied rule reminds Cursor about its memory capabilities, ensuring it actively uses and updates Honcho throughout every session.
-
-## MCP Tools
+### MCP Tools
 
 | Tool | Description |
 |------|-------------|
@@ -185,7 +147,17 @@ An always-applied rule reminds Cursor about its memory capabilities, ensuring it
 | `chat` | Query Honcho's knowledge about the user |
 | `create_conclusion` | Save insights about the user to memory |
 
-## Hook Events
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/recall [topic]` | Search memory for something specific |
+| `/remember [fact]` | Save something to persistent memory |
+| `/honcho:interview` | Interview to capture preferences |
+| `/honcho:status` | Show memory system status |
+| `/honcho:setup` | Guided first-time configuration |
+
+### Hook Events
 
 | Hook | Purpose |
 |------|---------|
@@ -199,62 +171,59 @@ An always-applied rule reminds Cursor about its memory capabilities, ensuring it
 | `afterAgentThought` | Capture deep reasoning |
 | `afterAgentResponse` | Save assistant prose responses |
 
+## Global Configuration
+
+Honcho stores persistent config at `~/.honcho/config.json`. This is created automatically on first run, or you can edit it manually:
+
+```json
+{
+  "apiKey": "hch-your-key-here",
+  "peerName": "eri",
+  "hosts": {
+    "cursor": {
+      "workspace": "cursor",
+      "aiPeer": "cursor"
+    },
+    "claude_code": {
+      "workspace": "claude_code",
+      "aiPeer": "clawd"
+    }
+  }
+}
+```
+
+Each host gets its own `workspace` and `aiPeer` identity. The `peerName` (your identity) is shared across hosts. If you use both [cursor-honcho](https://github.com/plastic-labs/cursor-honcho) and [claude-honcho](https://github.com/plastic-labs/claude-honcho), they read the same config file without conflicts.
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `HONCHO_API_KEY` | **Yes** | -- | Your Honcho API key from [app.honcho.dev](https://app.honcho.dev) |
 | `HONCHO_PEER_NAME` | No | `$USER` | Your identity in the memory system |
-| `HONCHO_WORKSPACE` | No | `cursor` | Workspace name |
-| `HONCHO_CURSOR_PEER` | No | `cursor` | How the AI is identified |
+| `HONCHO_WORKSPACE` | No | auto-detected | Workspace name (auto-detected from host) |
+| `HONCHO_AI_PEER` | No | auto-detected | How the AI is identified (auto-detected from host) |
 | `HONCHO_ENDPOINT` | No | `production` | `production`, `local`, or a custom URL |
 | `HONCHO_ENABLED` | No | `true` | Set to `false` to disable |
 | `HONCHO_SAVE_MESSAGES` | No | `true` | Set to `false` to stop saving messages |
 | `HONCHO_LOGGING` | No | `true` | Set to `false` to disable file logging |
-
-## Architecture
-
-```
-+---------------------------------------------------------------+
-|                          Cursor IDE                           |
-+---------------------------------------------------------------+
-| sessionStart  | beforeSubmit | postToolUse | subagentStop     |
-| ------------- | ------------ | ----------- | --------         |
-| Load context  | Save message | Log activity| Capture subagent |
-| from Honcho   | to Honcho    | to Honcho   | results          |
-+---------------------------------------------------------------+
-                              |
-                              v
-+---------------------------------------------------------------+
-|                         Honcho API                            |
-|                                                               |
-|   Messages + reasoning -> Persistent Memory ->                |
-|   Retrieved as context at session start                       |
-+---------------------------------------------------------------+
-```
-
-## Cross-Surface Integration
-
-To share memory with other Honcho-connected tools (e.g. [claude-honcho](https://github.com/plastic-labs/claude-honcho)), set the same workspace on both sides:
-
-```bash
-export HONCHO_WORKSPACE="shared"  # Set identically in both tools
-```
-
-The AI peers remain separate (`cursor` vs `claude`), so Honcho distinguishes who said what while maintaining a unified model of you.
 
 ## Troubleshooting
 
 ### "Not configured" or no memory loading
 
 1. Check your API key: `echo $HONCHO_API_KEY`
-2. Check `.cursor/hooks.json` exists in your project
-3. Open View > Output > "Hooks" to see hook execution logs
-4. Restart Cursor after changes
+2. Make sure you opened Cursor from a terminal where the key is set
+3. Run `/honcho:setup` for guided diagnostics
 
-### Memory not persisting
+### MCP tools not available
 
-Make sure `HONCHO_SAVE_MESSAGES` is not `false`.
+1. Check `.cursor/mcp.json` exists in your project root with the correct absolute path
+2. Restart Cursor after changing MCP config
+
+### sessionStart context not loading
+
+1. The hooks.json paths must be absolute (not relative)
+2. Check Cursor's hook logs for JSON parse errors -- if you see ANSI escape codes in the output, update to the latest version which suppresses TTY output in non-interactive mode
 
 ### Using a local Honcho instance
 
@@ -268,10 +237,6 @@ export HONCHO_ENDPOINT="local"  # Uses localhost:8000
 export HONCHO_ENABLED="false"
 ```
 
-### Debugging hooks
-
-Open the **Hooks output channel** in Cursor (View > Output, select "Hooks" from the dropdown) to see what hooks are firing and any errors.
-
 ---
 
 # `honcho-dev` Plugin
@@ -283,16 +248,6 @@ Open the **Hooks output channel** in Cursor (View > Output, select "Hooks" from 
 | `/honcho-dev:integrate` | Add Honcho to your project |
 | `/honcho-dev:migrate-py` | Migrate Python code to latest Honcho SDK |
 | `/honcho-dev:migrate-ts` | Migrate TypeScript code to latest Honcho SDK |
-
-Install via the [Cursor Marketplace](https://cursor.com/marketplace) or copy the skills from `plugins/honcho-dev/skills/` into your project's `.cursor/` directory.
-
----
-
-## Uninstalling
-
-**Marketplace install**: Remove via Cursor Settings > Plugins.
-
-**Manual install**: Delete the `.cursor/hooks.json`, `.cursor/mcp.json`, and `.cursor/rules/honcho-memory.mdc` files from your project.
 
 ---
 
@@ -310,4 +265,3 @@ MIT -- see [LICENSE](LICENSE)
 - **Plastic Labs**: [plasticlabs.ai](https://plasticlabs.ai)
 - **Honcho**: [honcho.dev](https://honcho.dev)
 - **Documentation**: [docs.honcho.dev](https://docs.honcho.dev)
-- **Claude Code version**: [claude-honcho](https://github.com/plastic-labs/claude-honcho)

@@ -1,19 +1,22 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { existsSync, readFileSync } from "fs";
 import { getInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
+import { outputStop, outputSystemMessage } from "../output.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  stop_hook_active?: boolean;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
   status?: string;
   loop_count?: number;
 }
@@ -113,9 +116,9 @@ export async function handleStop(): Promise<void> {
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
       hookInput = JSON.parse(input);
     }
@@ -123,7 +126,12 @@ export async function handleStop(): Promise<void> {
     process.exit(0);
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  // Claude Code: if stop_hook_active is true, we're in a continuation loop -- bail
+  if (hookInput.stop_hook_active) {
+    process.exit(0);
+  }
+
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const transcriptPath = hookInput.transcript_path;
   const sessionName = getSessionName(cwd);
 
@@ -135,8 +143,7 @@ export async function handleStop(): Promise<void> {
 
   if (!lastMessage || !isMeaningfulContent(lastMessage)) {
     logHook("stop", `Skipping (no meaningful content)`);
-    // Output empty JSON - don't output followup_message to avoid auto-loops
-    console.log(JSON.stringify({}));
+    outputStop();
     process.exit(0);
   }
 
@@ -147,29 +154,32 @@ export async function handleStop(): Promise<void> {
 
     // Get session and peer using fluent API
     const session = await honcho.session(sessionName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
 
     // Upload the assistant response
     const instanceId = getInstanceId();
     logApiCall("session.addMessages", "POST", `assistant response (${lastMessage.length} chars)`);
 
     await session.addMessages([
-      cursorPeer.message(lastMessage.slice(0, 3000), {
+      aiPeer.message(lastMessage.slice(0, 3000), {
         metadata: {
           instance_id: instanceId || undefined,
-          model: hookInput.model,
           type: "assistant_response",
           session_affinity: sessionName,
+          model: hookInput.model || undefined,
+          cursor_version: hookInput.cursor_version || undefined,
+          user_email: hookInput.user_email || undefined,
+          generation_id: hookInput.generation_id || undefined,
         },
       }),
     ]);
 
     logHook("stop", `Assistant response saved`);
+    outputStop(`[honcho] response \u2192 saved response (${lastMessage.length} chars)`);
   } catch (error) {
     logHook("stop", `Upload failed: ${error}`, { error: String(error) });
+    outputStop();
   }
 
-  // Output empty JSON - don't output followup_message to avoid auto-loops
-  console.log(JSON.stringify({}));
   process.exit(0);
 }

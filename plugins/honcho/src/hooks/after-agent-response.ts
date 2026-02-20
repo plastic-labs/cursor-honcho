@@ -1,19 +1,20 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { getInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
 interface CursorHookInput {
-  conversation_id?: string;
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  text?: string;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  text?: string;
 }
 
 function isMeaningfulContent(content: string): boolean {
@@ -37,13 +38,13 @@ export async function handleAfterAgentResponse(): Promise<void> {
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) hookInput = JSON.parse(input);
   } catch {
     process.exit(0);
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const text = hookInput.text || "";
 
   setLogContext(cwd, getSessionName(cwd));
@@ -58,15 +59,14 @@ export async function handleAfterAgentResponse(): Promise<void> {
     const honcho = new Honcho(getHonchoClientOptions(config));
     const sessionName = getSessionName(cwd);
     const session = await honcho.session(sessionName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
     const instanceId = getInstanceId();
 
     logApiCall("session.addMessages", "POST", `response (${text.length} chars)`);
     await session.addMessages([
-      cursorPeer.message(text.slice(0, 3000), {
+      aiPeer.message(text.slice(0, 3000), {
         metadata: {
           instance_id: instanceId || undefined,
-          model: hookInput.model,
           type: "assistant_response",
           session_affinity: sessionName,
         },
