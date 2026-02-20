@@ -202,7 +202,10 @@ export function loadConfigFromEnv(host?: HonchoHost): HonchoConfig | null {
   const resolvedHost = host ?? getDetectedHost();
   const peerName = process.env.HONCHO_PEER_NAME || process.env.USER || "user";
   const workspace = process.env.HONCHO_WORKSPACE || DEFAULT_WORKSPACE[resolvedHost];
-  const aiPeer = process.env.HONCHO_AI_PEER || process.env.HONCHO_CURSOR_PEER || process.env.HONCHO_CLAUDE_PEER || DEFAULT_AI_PEER[resolvedHost];
+  const hostPeerEnv = resolvedHost === "cursor"
+    ? process.env.HONCHO_CURSOR_PEER
+    : process.env.HONCHO_CLAUDE_PEER;
+  const aiPeer = process.env.HONCHO_AI_PEER || hostPeerEnv || DEFAULT_AI_PEER[resolvedHost];
   const endpoint = process.env.HONCHO_ENDPOINT;
 
   const config: HonchoConfig = {
