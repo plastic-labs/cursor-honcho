@@ -8,7 +8,7 @@ import {
   incrementMessageCount,
   shouldRefreshKnowledgeGraph,
   markKnowledgeGraphRefreshed,
-  getClaudeInstanceId,
+  getInstanceId,
   chunkContent,
 } from "../cache.js";
 import { logHook, logApiCall, logCache, setLogContext } from "../log.js";
@@ -203,7 +203,7 @@ async function uploadMessageAsync(config: any, cwd: string, prompt: string, hook
   const userPeer = await honcho.peer(config.peerName);
 
   // Chunk large messages to stay under API size limits
-  const instanceId = getClaudeInstanceId();
+  const instanceId = getInstanceId();
   const chunks = chunkContent(prompt);
   const messages = chunks.map(chunk =>
     userPeer.message(chunk, {

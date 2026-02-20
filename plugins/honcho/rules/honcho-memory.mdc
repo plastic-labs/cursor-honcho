@@ -1,4 +1,5 @@
 ---
+name: honcho-memory
 description: Honcho persistent memory system is active. The agent has cross-session memory and should leverage it.
 alwaysApply: true
 ---

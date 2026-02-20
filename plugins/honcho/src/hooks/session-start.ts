@@ -2,10 +2,10 @@ import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionForPath, setSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import {
   setCachedUserContext,
-  setCachedClaudeContext,
-  loadClaudeLocalContext,
+  setCachedAIContext,
+  loadLocalWorkContext,
   resetMessageCount,
-  setClaudeInstanceId,
+  setInstanceId,
   getCachedGitState,
   setCachedGitState,
   detectGitChanges,
@@ -80,7 +80,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
   const isBackground = hookInput.is_background_agent || false;
 
   if (cursorInstanceId) {
-    setClaudeInstanceId(cursorInstanceId);
+    setInstanceId(cursorInstanceId);
   }
 
   const sessionName = getSessionName(cwd);
@@ -203,7 +203,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
       contextParts.push(`## Git Activity Since Last Session\n${changeDescriptions}`);
     }
 
-    const localContext = loadClaudeLocalContext();
+    const localContext = loadLocalWorkContext();
     if (localContext) {
       contextParts.push(`## CLAUDE Local Context (What I Was Working On)\n${localContext.slice(0, 2000)}`);
     }
@@ -288,7 +288,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
 
     if (cursorContextResult.status === "fulfilled" && cursorContextResult.value) {
       const context = cursorContextResult.value as any;
-      setCachedClaudeContext(context);
+      setCachedAIContext(context);
       const rep = context.representation;
       if (rep) {
         const repText = formatRepresentation(rep);

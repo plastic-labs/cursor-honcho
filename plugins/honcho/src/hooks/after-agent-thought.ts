@@ -1,6 +1,6 @@
 import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
-import { getClaudeInstanceId } from "../cache.js";
+import { getInstanceId } from "../cache.js";
 import { logHook, setLogContext } from "../log.js";
 
 interface CursorHookInput {
@@ -50,7 +50,7 @@ export async function handleAfterAgentThought(): Promise<void> {
     const sessionName = getSessionName(cwd);
     const session = await honcho.session(sessionName);
     const aiPeer = await honcho.peer(config.aiPeer);
-    const instanceId = getClaudeInstanceId();
+    const instanceId = getInstanceId();
 
     // Truncate to avoid API limits but keep the valuable reasoning
     const truncated = text.length > 4000 ? text.slice(0, 4000) + "..." : text;

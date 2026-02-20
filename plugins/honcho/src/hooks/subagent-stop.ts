@@ -1,6 +1,6 @@
 import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
-import { getClaudeInstanceId, appendClaudeWork } from "../cache.js";
+import { getInstanceId, appendWork } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
 interface CursorHookInput {
@@ -58,7 +58,7 @@ export async function handleSubagentStop(): Promise<void> {
   logHook("subagent-stop", `Subagent ${subagentType} completed`, { status, duration });
 
   // Log to local context
-  appendClaudeWork(`Subagent (${subagentType}): completed${durationStr}`);
+  appendWork(`Subagent (${subagentType}): completed${durationStr}`);
 
   // Upload to Honcho
   try {
@@ -66,7 +66,7 @@ export async function handleSubagentStop(): Promise<void> {
     const sessionName = getSessionName(cwd);
     const session = await honcho.session(sessionName);
     const aiPeer = await honcho.peer(config.aiPeer);
-    const instanceId = getClaudeInstanceId();
+    const instanceId = getInstanceId();
 
     logApiCall("session.addMessages", "POST", `subagent result: ${subagentType}`);
     await session.addMessages([

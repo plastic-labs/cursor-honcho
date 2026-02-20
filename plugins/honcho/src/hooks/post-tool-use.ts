@@ -1,6 +1,6 @@
 import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
-import { appendClaudeWork, getClaudeInstanceId } from "../cache.js";
+import { appendWork, getInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 import { outputToolCapture } from "../output.js";
 
@@ -153,6 +153,7 @@ function formatToolSummary(
       const changeSummary = summarizeEdit(oldStr, newStr, filePath);
       return `Edited ${fileName}: ${changeSummary}`;
     }
+    case "Shell":
     case "Bash": {
       const command = (toolInput.command || "").slice(0, 100);
       const success = !toolOutput.error;
@@ -236,7 +237,7 @@ export async function handlePostToolUse(): Promise<void> {
   outputToolCapture(summary);
 
   // INSTANT: Update local context file (~2ms)
-  appendClaudeWork(summary);
+  appendWork(summary);
 
   // Upload to Honcho and wait for completion
   await logToHonchoAsync(config, cwd, summary).catch((e) => logHook("post-tool-use", `Upload failed: ${e}`, { error: String(e) }));
@@ -259,7 +260,7 @@ async function logToHonchoAsync(config: any, cwd: string, summary: string): Prom
 
   // Log the tool use with instance_id and session_affinity for project-scoped fact extraction
   logApiCall("session.addMessages", "POST", `tool: ${summary.slice(0, 50)}`);
-  const instanceId = getClaudeInstanceId();
+  const instanceId = getInstanceId();
 
   await session.addMessages([
     aiPeer.message(`[Tool] ${summary}`, {

@@ -1,5 +1,6 @@
 {
   "name": "honcho",
+  "displayName": "Honcho",
   "version": "0.1.0",
   "description": "Persistent memory for Cursor sessions using Honcho by Plastic Labs",
   "author": {
@@ -10,6 +11,8 @@
   "repository": "https://github.com/plastic-labs/cursor-honcho",
   "license": "MIT",
   "keywords": ["memory", "context", "ai", "honcho", "persistence", "cursor"],
+  "category": "productivity",
+  "tags": ["memory", "persistence", "context", "agent-orchestration"],
   "logo": "assets/logo.svg",
   "hooks": "./hooks/hooks.json",
   "mcpServers": "./mcp.json",

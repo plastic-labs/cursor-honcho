@@ -164,7 +164,6 @@ export async function handleStop(): Promise<void> {
       aiPeer.message(lastMessage.slice(0, 3000), {
         metadata: {
           instance_id: instanceId || undefined,
-          model: hookInput.model,
           type: "assistant_response",
           session_affinity: sessionName,
           model: hookInput.model || undefined,
