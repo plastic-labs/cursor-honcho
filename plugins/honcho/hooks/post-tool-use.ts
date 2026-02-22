@@ -4,6 +4,7 @@ import { handlePostToolUse } from "../src/hooks/post-tool-use.js";
 
 const stdinText = await Bun.stdin.text();
 cacheStdin(stdinText);
-const input = JSON.parse(stdinText || "{}");
+let input = {};
+try { input = JSON.parse(stdinText || "{}"); } catch { /* malformed stdin */ }
 setDetectedHost(detectHost(input));
 await handlePostToolUse();

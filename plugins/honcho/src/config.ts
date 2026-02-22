@@ -68,7 +68,7 @@ const DEFAULT_WORKSPACE: Record<HonchoHost, string> = {
 
 const DEFAULT_AI_PEER: Record<HonchoHost, string> = {
   "cursor": "cursor",
-  "claude_code": "clawd",
+  "claude_code": "claude",
 };
 
 // Stdin cache: entry points read stdin once, handlers consume from cache
@@ -171,7 +171,7 @@ function resolveConfig(raw: HonchoFileConfig, host: HonchoHost): HonchoConfig | 
     if (host === "cursor") {
       aiPeer = raw.cursorPeer ?? "cursor";
     } else {
-      aiPeer = raw.claudePeer ?? "clawd";
+      aiPeer = raw.claudePeer ?? "claude";
     }
   }
 

@@ -66,7 +66,7 @@ async function setup(): Promise<void> {
       apiKey: config.apiKey,
       peerName: config.peerName,
       workspace: host === "cursor" ? "cursor" : "claude_code",
-      aiPeer: host === "cursor" ? "cursor" : "clawd",
+      aiPeer: host === "cursor" ? "cursor" : "claude",
       saveMessages: true,
       enabled: true,
       logging: true,
