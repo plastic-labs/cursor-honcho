@@ -2,6 +2,7 @@ import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import {
   getCachedUserContext,
+  getStaleCachedUserContext,
   isContextCacheStale,
   setCachedUserContext,
   queueMessage,
@@ -164,11 +165,22 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   }
 
   // Fetch fresh context when:
-  // 1. Cache is stale (>60s old), OR
+  // 1. Cache is stale (TTL expired), OR
   // 2. Message threshold reached (every N messages)
+  // Race against a 5s timeout -- serve stale cache on timeout instead of failing.
   logCache("miss", "userContext", forceRefresh ? "threshold refresh" : "stale cache");
-  try {
-    const { parts: contextParts, conclusionCount } = await fetchFreshContext(config, cwd, prompt);
+
+  const FETCH_TIMEOUT_MS = 5000;
+  const fetchResult = await Promise.race([
+    fetchFreshContext(config, cwd, prompt).then(r => ({ ok: true as const, ...r })),
+    new Promise<{ ok: false }>(resolve => setTimeout(() => resolve({ ok: false }), FETCH_TIMEOUT_MS)),
+  ]).catch((e): { ok: false } => {
+    logHook("before-submit-prompt", `Context fetch failed: ${e}`, { error: String(e) });
+    return { ok: false };
+  });
+
+  if (fetchResult.ok) {
+    const { parts: contextParts, conclusionCount } = fetchResult;
     if (contextParts.length > 0) {
       outputPromptContext({
         peerName: config.peerName,
@@ -179,13 +191,28 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
     } else {
       outputPromptContinue("[honcho] user-prompt \u2022 no matching context found");
     }
-    // Mark that we refreshed the knowledge graph
     if (forceRefresh) {
       markKnowledgeGraphRefreshed();
     }
-  } catch {
-    // Don't block prompt submission on failure
-    outputPromptContinue("[honcho] user-prompt \u2717 context fetch failed");
+  } else {
+    // Timeout or error -- serve stale cache instead of showing nothing
+    const staleContext = getStaleCachedUserContext();
+    if (staleContext) {
+      logHook("before-submit-prompt", "Serving stale cache after timeout/error");
+      const contextParts = formatCachedContext(staleContext, config.peerName);
+      if (contextParts.length > 0) {
+        outputPromptContext({
+          peerName: config.peerName,
+          aiPeer: config.aiPeer,
+          contextParts,
+          systemMsg: `[honcho] user-prompt \u2190 context injected (stale)`,
+        });
+      } else {
+        outputPromptContinue("[honcho] user-prompt \u2717 context unavailable");
+      }
+    } else {
+      outputPromptContinue("[honcho] user-prompt \u2717 context unavailable");
+    }
   }
 
   // Ensure upload completes before exit
@@ -263,9 +290,9 @@ async function fetchFreshContext(config: any, cwd: string, prompt: string): Prom
   const contextResult = await session.context({
     searchQuery,
     representationOptions: {
-      searchTopK: 10,
+      searchTopK: 5,
       searchMaxDistance: 0.7,
-      maxConclusions: 15,
+      maxConclusions: 10,
     },
   });
 
