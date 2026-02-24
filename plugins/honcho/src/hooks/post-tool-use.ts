@@ -261,11 +261,14 @@ async function logToHonchoAsync(config: any, cwd: string, summary: string): Prom
   // Log the tool use with instance_id and session_affinity for project-scoped fact extraction
   logApiCall("session.addMessages", "POST", `tool: ${summary.slice(0, 50)}`);
   const instanceId = getInstanceId();
+  const { getTurnId } = await import("../cache.js");
+  const turnId = getTurnId();
 
   await session.addMessages([
     aiPeer.message(`[Tool] ${summary}`, {
       metadata: {
         instance_id: instanceId || undefined,
+        turn_id: turnId || undefined,
         session_affinity: sessionName,
       },
     }),

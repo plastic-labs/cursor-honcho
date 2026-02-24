@@ -84,6 +84,19 @@ export function setCachedSessionId(cwd: string, name: string, id: string): void 
   saveIdCache(cache);
 }
 
+/** Find the most recently active CWD from cached sessions (fallback for MCP servers without CURSOR_PROJECT_DIR) */
+export function getLastActiveCwd(): string | null {
+  const cache = loadIdCache();
+  if (!cache.sessions) return null;
+  let latest: { cwd: string; updatedAt: string } | null = null;
+  for (const [cwd, entry] of Object.entries(cache.sessions)) {
+    if (!latest || entry.updatedAt > latest.updatedAt) {
+      latest = { cwd, updatedAt: entry.updatedAt };
+    }
+  }
+  return latest?.cwd || null;
+}
+
 // Instance tracking for parallel session support
 export function getInstanceId(): string | null {
   const cache = loadIdCache();

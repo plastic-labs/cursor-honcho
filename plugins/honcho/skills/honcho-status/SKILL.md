@@ -1,5 +1,5 @@
 ---
-name: status
+name: honcho-status
 description: Show current Honcho memory status and configuration
 user-invocable: true
 ---
@@ -13,7 +13,7 @@ Display the current Honcho memory system status, including configuration, sessio
 1. **Plugin Status** - Whether Honcho memory is enabled or disabled
 2. **Configuration** - Peer name, Cursor peer, workspace, message saving preference
 3. **Current Session** - The session name for the current directory
-4. **Endpoint** - Whether using SaaS (api.honcho.dev) or local instance
+4. **Endpoint** - Whether using platform (api.honcho.dev) or local instance
 5. **Cache Status** - Current cache state and freshness
 
 ## Usage

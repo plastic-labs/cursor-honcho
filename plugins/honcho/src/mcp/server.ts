@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Honcho } from "@honcho-ai/sdk";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import {
   loadConfig,
   saveConfig,
@@ -27,6 +27,7 @@ import {
   loadIdCache,
   loadContextCache,
   getQueuedMessages,
+  getLastActiveCwd,
   clearIdCache,
   clearPeerCache,
   clearUserContextOnly,
@@ -78,11 +79,13 @@ function handleGetConfig(cwd: string) {
 
   // Resolved config
   const linkedWorkspaces = getLinkedWorkspaces();
+  const globalOverride = rawFile.globalOverride === true;
   const resolved = cfg ? {
     peerName: cfg.peerName,
     aiPeer: cfg.aiPeer,
     workspace: cfg.workspace,
     endpoint: getEndpointInfo(cfg),
+    globalOverride,
     sessionStrategy: cfg.sessionStrategy ?? "per-directory",
     sessionPeerPrefix: cfg.sessionPeerPrefix !== false,
     linkedHosts: cfg.linkedHosts ?? [],
@@ -100,7 +103,7 @@ function handleGetConfig(cwd: string) {
   const sessionName = cfg ? getSessionName(cwd) : null;
   const endpointInfo = cfg ? getEndpointInfo(cfg) : null;
   const endpointLabel = endpointInfo
-    ? endpointInfo.type === "production" ? "SaaS" : endpointInfo.type
+    ? endpointInfo.type === "production" ? "platform" : endpointInfo.type
     : null;
 
   const current = cfg ? {
@@ -138,14 +141,28 @@ function handleGetConfig(cwd: string) {
   // Warnings
   const warnings: string[] = [];
 
+  // Host-specific fields (workspace, aiPeer) are NOT overridden by env vars
+  // when a hosts block exists. Only warn about env vars that actually apply.
+  const hasHostsBlock = !!rawFile.hosts?.[host];
+  const hostSpecificFields = new Set(["workspace", "aiPeer"]);
+
   for (const [field, envVar] of Object.entries(ENV_SHADOW_MAP)) {
-    if (process.env[envVar]) {
-      warnings.push(`${field} is shadowed by env var ${envVar}="${process.env[envVar]}"`);
+    const envVal = process.env[envVar];
+    if (!envVal) continue;
+    if (hasHostsBlock && hostSpecificFields.has(field)) {
+      // Env var is set but hosts block takes precedence — not actually shadowed
+      warnings.push(`env var ${envVar}="${envVal}" is set but ignored (hosts block takes precedence). Remove it from your shell config.`);
+    } else {
+      warnings.push(`${field} is shadowed by env var ${envVar}="${envVal}"`);
     }
   }
 
   if (cfgExists && !rawFile.hosts) {
     warnings.push("Config uses legacy flat fields. Consider running /honcho:config to migrate to hosts block.");
+  }
+
+  if (cfgExists && rawFile.hosts && rawFile.workspace && rawFile.globalOverride === undefined) {
+    warnings.push("Config has flat 'workspace' alongside hosts block but no 'globalOverride' set. The flat field is unused. Set globalOverride=true to apply it globally, or remove it.");
   }
 
   if (cfg && idCache.workspace && idCache.workspace.name !== cfg.workspace) {
@@ -240,8 +257,8 @@ function handleSetConfig(args: Record<string, unknown>) {
     case "endpoint.environment":
       previousValue = cfg.endpoint?.environment;
       if (!cfg.endpoint) cfg.endpoint = {};
-      // Accept "saas" as alias for "production"
-      const envVal = String(value) === "saas" ? "production" : String(value);
+      // Accept "platform" as alias for "production"
+      const envVal = String(value) === "platform" ? "production" : String(value);
       cfg.endpoint.environment = envVal as HonchoEnvironment;
       cfg.endpoint.baseUrl = undefined;
       clearIdCache();
@@ -276,6 +293,35 @@ function handleSetConfig(args: Record<string, unknown>) {
       const hosts = Array.isArray(value) ? value.map(String) : [];
       cfg.linkedHosts = hosts.length ? hosts : undefined;
       break;
+    }
+
+    case "globalOverride": {
+      // Read-modify-write the raw file directly since globalOverride
+      // is a file-level field, not part of the resolved HonchoConfig
+      const goCfgPath = getConfigPath();
+      let goRaw: Record<string, any> = {};
+      try { goRaw = JSON.parse(readFileSync(goCfgPath, "utf-8")); } catch { /* */ }
+      previousValue = goRaw.globalOverride ?? false;
+      goRaw.globalOverride = Boolean(value);
+      if (goRaw.globalOverride && !goRaw.workspace) {
+        // When enabling, ensure flat workspace exists
+        goRaw.workspace = cfg.workspace;
+      }
+      writeFileSync(goCfgPath, JSON.stringify(goRaw, null, 2));
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            success: true,
+            field,
+            previousValue,
+            newValue: Boolean(value),
+            description: Boolean(value)
+              ? "Global override enabled: flat workspace field now applies to ALL hosts."
+              : "Global override disabled: each host uses its own hosts block.",
+          }, null, 2),
+        }],
+      };
     }
 
     case "enabled":
@@ -402,9 +448,8 @@ function handleSetConfig(args: Record<string, unknown>) {
 }
 
 export async function runMcpServer(): Promise<void> {
-  // Detect host from environment: Cursor sets CURSOR_PROJECT_DIR
-  const host = process.env.CURSOR_PROJECT_DIR ? "cursor" : "claude_code";
-  setDetectedHost(host);
+  // Detect host: HONCHO_HOST env var > CURSOR_PROJECT_DIR > default cursor (MCP = likely Cursor)
+  setDetectedHost(detectHost());
   const config = loadConfig();
   const configured = config !== null;
 
@@ -493,6 +538,7 @@ export async function runMcpServer(): Promise<void> {
                   "peerName",
                   "aiPeer",
                   "workspace",
+                  "globalOverride",
                   "endpoint.environment",
                   "endpoint.baseUrl",
                   "sessionStrategy",
@@ -529,7 +575,7 @@ export async function runMcpServer(): Promise<void> {
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    const cwd = process.env.CURSOR_PROJECT_DIR || process.cwd();
+    const cwd = process.env.CURSOR_PROJECT_DIR || getLastActiveCwd() || process.cwd();
 
     // ── Config tools (no Honcho session needed) ──
 

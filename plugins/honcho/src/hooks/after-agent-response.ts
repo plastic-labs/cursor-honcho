@@ -1,6 +1,6 @@
 import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
-import { getInstanceId } from "../cache.js";
+import { getInstanceId, getTurnId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
 interface CursorHookInput {
@@ -61,14 +61,19 @@ export async function handleAfterAgentResponse(): Promise<void> {
     const session = await honcho.session(sessionName);
     const aiPeer = await honcho.peer(config.aiPeer);
     const instanceId = getInstanceId();
+    const turnId = getTurnId();
 
     logApiCall("session.addMessages", "POST", `response (${text.length} chars)`);
     await session.addMessages([
       aiPeer.message(text.slice(0, 3000), {
         metadata: {
           instance_id: instanceId || undefined,
+          turn_id: turnId || undefined,
           type: "assistant_response",
           session_affinity: sessionName,
+          model: hookInput.model || undefined,
+          cursor_version: hookInput.cursor_version || undefined,
+          generation_id: hookInput.generation_id || undefined,
         },
       }),
     ]);

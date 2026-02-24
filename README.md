@@ -20,12 +20,28 @@ Give [Cursor](https://cursor.com) and [Claude Code](https://github.com/plastic-l
 
 # `honcho` Plugin
 
-## Prerequisites
+## Quick Install
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/plastic-labs/cursor-honcho/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/plastic-labs/cursor-honcho/main/install.ps1 | iex
+```
+
+The installer handles everything: bun, dependencies, global hooks, and MCP config. You just need a [free API key](https://app.honcho.dev).
+
+## Manual Setup
+
+### Prerequisites
 
 1. **Bun** -- install with `curl -fsSL https://bun.sh/install | bash`
 2. **Honcho API key** -- free at [app.honcho.dev](https://app.honcho.dev)
-
-## Setup
 
 ### 1. Set your API key
 
@@ -187,12 +203,15 @@ Honcho stores persistent config at `~/.honcho/config.json`. This is created auto
     "claude_code": {
       "workspace": "claude_code",
       "aiPeer": "claude"
+    },
+    "obsidian": {
+      "workspace": "obsidian"
     }
   }
 }
 ```
 
-Each host gets its own `workspace` and `aiPeer` identity. The `peerName` (your identity) is shared across hosts. If you use both [cursor-honcho](https://github.com/plastic-labs/cursor-honcho) and [claude-honcho](https://github.com/plastic-labs/claude-honcho), they read the same config file without conflicts.
+Each host gets its own `workspace` and `aiPeer` identity. The `peerName` (your identity) is shared across hosts. All three plugins -- [cursor-honcho](https://github.com/plastic-labs/cursor-honcho), [claude-honcho](https://github.com/plastic-labs/claude-honcho), and [obsidian-honcho](https://github.com/plastic-labs/obsidian-honcho) -- read the same config file without conflicts. Obsidian uses a single-peer model (no `aiPeer`) since your notes are the messages, not a conversation with an AI.
 
 ## Environment Variables
 

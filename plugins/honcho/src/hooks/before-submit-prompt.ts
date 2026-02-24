@@ -10,6 +10,7 @@ import {
   shouldRefreshKnowledgeGraph,
   markKnowledgeGraphRefreshed,
   getInstanceId,
+  newTurnId,
   chunkContent,
 } from "../cache.js";
 import { logHook, logApiCall, logCache, setLogContext } from "../log.js";
@@ -111,6 +112,10 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
 
   logHook("before-submit-prompt", `Prompt received (${prompt.length} chars)`);
 
+  // Generate a new turn_id for this prompt/response cycle
+  const turnId = newTurnId();
+  logHook("before-submit-prompt", `Turn ${turnId}`);
+
   // CRITICAL: Save message to local queue FIRST (instant, ~1-3ms)
   // This survives ctrl+c, network failures, everything
   if (config.saveMessages !== false) {
@@ -120,7 +125,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   // Start upload immediately (we'll await before exit)
   let uploadPromise: Promise<void> | null = null;
   if (config.saveMessages !== false) {
-    uploadPromise = uploadMessageAsync(config, cwd, prompt, hookInput);
+    uploadPromise = uploadMessageAsync(config, cwd, prompt, hookInput, turnId);
   }
 
   // Track message count for threshold-based knowledge graph refresh
@@ -220,7 +225,7 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   process.exit(0);
 }
 
-async function uploadMessageAsync(config: any, cwd: string, prompt: string, hookInput?: any): Promise<void> {
+async function uploadMessageAsync(config: any, cwd: string, prompt: string, hookInput?: any, turnId?: string): Promise<void> {
   logApiCall("session.addMessages", "POST", `user prompt (${prompt.length} chars)`);
   const honcho = new Honcho(getHonchoClientOptions(config));
   const sessionName = getSessionName(cwd);
@@ -236,6 +241,7 @@ async function uploadMessageAsync(config: any, cwd: string, prompt: string, hook
     userPeer.message(chunk, {
       metadata: {
         instance_id: instanceId || undefined,
+        turn_id: turnId || undefined,
         session_affinity: sessionName,
         model: hookInput?.model || undefined,
         cursor_version: hookInput?.cursor_version || undefined,

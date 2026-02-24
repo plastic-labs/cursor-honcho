@@ -1,5 +1,5 @@
 ---
-name: setup
+name: honcho-setup
 description: First-time Honcho configuration -- set API key, validate connection, create config
 user-invocable: true
 ---
@@ -37,10 +37,11 @@ Wait for the user to confirm they have set the key. If they paste the key direct
 
 ### 3. Validate the API key
 
-Test the connection by running:
+Test the connection by running the setup runner. Find the plugin directory first:
 
 ```bash
-bun run ./src/skills/setup-runner.ts
+HONCHO_PLUGIN="${HONCHO_PLUGIN_DIR:-$HOME/.honcho/plugins/cursor-honcho/plugins/honcho}"
+bun run "$HONCHO_PLUGIN/src/skills/setup-runner.ts"
 ```
 
 If it succeeds, the key is valid and the config file has been created.
@@ -49,6 +50,7 @@ If it fails, help the user troubleshoot:
 - Key not set: re-check shell config and restart Cursor
 - Authentication error: key may be invalid, get a new one from https://app.honcho.dev
 - Network error: check internet connection
+- Plugin not found: check that cursor-honcho is installed at `~/.honcho/plugins/cursor-honcho`
 
 ### 4. Confirm setup
 

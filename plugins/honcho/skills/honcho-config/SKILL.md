@@ -1,4 +1,5 @@
 ---
+name: honcho-config
 description: Configure Honcho memory plugin settings interactively
 allowed-tools: get_config, set_config
 user-invocable: true
@@ -14,7 +15,7 @@ Call `get_config` to load the current state. Display a status block:
 
 ```
 Workspace: {resolved.workspace}
-Session:   {current.session} ({resolved.sessionStrategy})
+Session:   {current.session} ({resolved.sessionStrategy} mapping)
 Peer:      {resolved.peerName}
 AI peer:   {resolved.aiPeer}
 Host:      {current.host}
@@ -38,10 +39,10 @@ Connection
   1. Peer name        -- your name in Honcho
   2. AI peer          -- the AI's name (affects memory retrieval)
   3. Workspace        -- data space (CAUTION: changes visible data)
-  4. Host             -- SaaS / local / custom URL
+  4. Host             -- platform / local / custom URL
 
 Behavior
-  5. Session strategy -- how sessions are created and named
+  5. Session mapping -- how sessions are created and named
   6. Linked hosts     -- merge context from other tools (cursor, claude, obsidian)
   7. Context refresh  -- TTL, message threshold, dialectic
   8. Message upload   -- token limits, summarization
@@ -60,13 +61,13 @@ Ask for the new value and call `set_config` with the appropriate field. Show the
 
 These require confirmation. First call `set_config` WITHOUT `confirm: true`. The tool will return a description of what will happen. Show this to the user and ask if they want to proceed. If yes, call `set_config` again WITH `confirm: true`.
 
-### Session strategy (5)
+### Session mapping (5)
 
 Explain the three modes:
 
 - **per-directory** (default): Session = `{peerName}-{repoName}`. Each project directory gets one session.
 - **git-branch**: Session = `{peerName}-{repoName}-{branch}`. Switching branches switches context. Each branch maintains its own memory thread.
-- **claude-instance**: Session = `claude-{session_id}`. Every Claude launch is a fresh session. No cross-session memory within a workspace.
+- **chat-instance**: Session = `chat-{session_id}`. Every chat is a fresh session. No cross-session memory within a workspace.
 
 Also mention: manual overrides in the sessions map always take precedence over any strategy.
 

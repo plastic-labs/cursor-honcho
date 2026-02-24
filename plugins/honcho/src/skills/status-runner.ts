@@ -5,9 +5,10 @@ import {
   getEndpointInfo,
   isPluginEnabled,
   getDetectedHost,
+  getSessionName,
 } from "../config.js";
 import { checkHooksInstalled, verifyCommandAvailable } from "../install.js";
-import { loadIdCache, loadContextCache, getInstanceId } from "../cache.js";
+import { loadIdCache, loadContextCache, getInstanceId, getLastActiveCwd } from "../cache.js";
 import * as s from "../styles.js";
 
 function status(): void {
@@ -36,6 +37,16 @@ function status(): void {
   console.log(`  ${s.label("Workspace")}:     ${config.workspace}`);
   console.log(`  ${s.label("Save messages")}: ${config.saveMessages !== false ? "enabled" : "disabled"}`);
   console.log(`  ${s.label("API key")}:       ${s.dim(config.apiKey.slice(0, 20) + "...")}`);
+
+  // Session info
+  const cwd = process.env.CURSOR_PROJECT_DIR || getLastActiveCwd() || process.cwd();
+  const sessionName = getSessionName(cwd);
+  const strategy = config.sessionStrategy ?? "per-directory";
+  console.log("");
+  console.log(s.section("Session"));
+  console.log(`  ${s.label("Name")}:          ${sessionName}`);
+  console.log(`  ${s.label("Mapping")}:       ${strategy}`);
+  console.log(`  ${s.label("Directory")}:     ${s.dim(cwd)}`);
 
   const endpointInfo = getEndpointInfo(config);
   console.log("");

@@ -8,11 +8,18 @@ import {
   getConfigDir,
   getHonchoClientOptions,
   getDetectedHost,
+  getDefaultWorkspace,
+  getDefaultAiPeer,
   configExists,
+  detectHost,
+  setDetectedHost,
 } from "../config.js";
 import * as s from "../styles.js";
 
 async function setup(): Promise<void> {
+  // Detect host early — HONCHO_HOST env var is checked by detectHost()
+  setDetectedHost(detectHost());
+
   console.log("");
   console.log(s.header("honcho setup"));
   console.log("");
@@ -65,8 +72,8 @@ async function setup(): Promise<void> {
     saveConfig({
       apiKey: config.apiKey,
       peerName: config.peerName,
-      workspace: host === "cursor" ? "cursor" : "claude_code",
-      aiPeer: host === "cursor" ? "cursor" : "claude",
+      workspace: getDefaultWorkspace(host),
+      aiPeer: getDefaultAiPeer(host),
       saveMessages: true,
       enabled: true,
       logging: true,

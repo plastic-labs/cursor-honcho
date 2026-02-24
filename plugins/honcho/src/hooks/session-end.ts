@@ -8,6 +8,7 @@ import {
   saveLocalWorkContext,
   loadLocalWorkContext,
   getInstanceId,
+  getTurnId,
   chunkContent,
 } from "../cache.js";
 import { playCooldown } from "../spinner.js";
@@ -329,12 +330,14 @@ export async function handleSessionEnd(): Promise<void> {
     // =====================================================
     // Step 4: Log session end marker
     // =====================================================
+    const turnId = getTurnId();
     await session.addMessages([
       aiPeer.message(
         `[Session ended] Reason: ${reason}, Messages: ${transcriptMessages.length}, Time: ${new Date().toISOString()}`,
         {
           metadata: {
             instance_id: instanceId || undefined,
+            turn_id: turnId || undefined,
             model: hookInput.model || undefined,
             session_affinity: sessionName,
           },

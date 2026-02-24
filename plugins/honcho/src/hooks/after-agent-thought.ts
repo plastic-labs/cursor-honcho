@@ -1,6 +1,6 @@
 import { Honcho } from "@honcho-ai/sdk";
 import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
-import { getInstanceId } from "../cache.js";
+import { getInstanceId, getTurnId } from "../cache.js";
 import { logHook, setLogContext } from "../log.js";
 
 interface CursorHookInput {
@@ -51,6 +51,7 @@ export async function handleAfterAgentThought(): Promise<void> {
     const session = await honcho.session(sessionName);
     const aiPeer = await honcho.peer(config.aiPeer);
     const instanceId = getInstanceId();
+    const turnId = getTurnId();
 
     // Truncate to avoid API limits but keep the valuable reasoning
     const truncated = text.length > 4000 ? text.slice(0, 4000) + "..." : text;
@@ -59,6 +60,7 @@ export async function handleAfterAgentThought(): Promise<void> {
       aiPeer.message(`[Reasoning] ${truncated}`, {
         metadata: {
           instance_id: instanceId || undefined,
+          turn_id: turnId || undefined,
           type: "agent_thought",
           duration_ms: durationMs,
           session_affinity: sessionName,

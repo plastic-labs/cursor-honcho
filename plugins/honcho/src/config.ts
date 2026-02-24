@@ -24,7 +24,7 @@ export interface LocalContextConfig {
   maxEntries?: number;
 }
 
-export type SessionStrategy = "per-directory" | "git-branch" | "claude-instance";
+export type SessionStrategy = "per-directory" | "git-branch" | "chat-instance";
 
 export type HonchoEnvironment = "production" | "local";
 
@@ -62,8 +62,14 @@ export function getDetectedHost(): HonchoHost {
 }
 
 export function detectHost(stdinInput?: Record<string, unknown>): HonchoHost {
+  // Explicit env var override (used by install scripts and external tooling)
+  const envHost = process.env.HONCHO_HOST;
+  if (envHost === "cursor" || envHost === "claude_code" || envHost === "obsidian") return envHost;
+
+  // Cursor's own AI sends cursor_version in stdin
   if (stdinInput?.cursor_version) return "cursor";
-  // Claude Code doesn't set cursor_version, and its hooks provide cwd/session_id
+  // Cursor sets CURSOR_PROJECT_DIR for child processes (incl. Claude Code inside Cursor)
+  if (process.env.CURSOR_PROJECT_DIR) return "cursor";
   return "claude_code";
 }
 
@@ -107,6 +113,7 @@ interface HonchoFileConfig {
   apiKey?: string;
   peerName?: string;
   workspace?: string;
+  aiPeer?: string;
   sessions?: Record<string, string>;
   saveMessages?: boolean;
   messageUpload?: MessageUploadConfig;
@@ -118,7 +125,11 @@ interface HonchoFileConfig {
   sessionStrategy?: SessionStrategy;
   sessionPeerPrefix?: boolean;
   hosts?: Record<string, HostConfig>;
-  // Legacy flat fields (read-only fallbacks)
+  /** When true, flat workspace/aiPeer fields apply to ALL hosts,
+   *  ignoring host-specific blocks. When false (default), each host
+   *  uses its own block and flat fields are fallbacks only. */
+  globalOverride?: boolean;
+  // Legacy flat fields (read-only fallbacks when no hosts block)
   cursorPeer?: string;
   claudePeer?: string;
 }
@@ -131,7 +142,7 @@ export interface HonchoConfig {
   aiPeer: string;
   /** Other host keys whose workspaces to also read context from */
   linkedHosts?: string[];
-  /** How sessions are named: per-directory, git-branch, or claude-instance */
+  /** How sessions are named: per-directory, git-branch, or chat-instance */
   sessionStrategy?: SessionStrategy;
   /** Prefix session names with peerName (default: true, disable for solo use) */
   sessionPeerPrefix?: boolean;
@@ -186,11 +197,17 @@ function resolveConfig(raw: HonchoFileConfig, host: HonchoHost): HonchoConfig | 
   let aiPeer: string;
 
   const hostBlock = raw.hosts?.[host];
-  if (hostBlock) {
+
+  if (raw.globalOverride === true) {
+    // Global override: flat fields apply to ALL hosts
+    workspace = raw.workspace ?? DEFAULT_WORKSPACE[host];
+    aiPeer = raw.aiPeer ?? hostBlock?.aiPeer ?? DEFAULT_AI_PEER[host];
+  } else if (hostBlock) {
+    // Host-specific block takes precedence
     workspace = hostBlock.workspace ?? DEFAULT_WORKSPACE[host];
     aiPeer = hostBlock.aiPeer ?? DEFAULT_AI_PEER[host];
   } else {
-    // Legacy fallback
+    // Legacy fallback (no hosts block, no globalOverride)
     workspace = raw.workspace ?? DEFAULT_WORKSPACE[host];
     if (host === "cursor") {
       aiPeer = raw.cursorPeer ?? "cursor";
@@ -322,6 +339,22 @@ export function saveConfig(config: HonchoConfig): void {
     ...(config.linkedHosts?.length ? { linkedHosts: config.linkedHosts } : {}),
   };
 
+  // Preserve globalOverride if set; never implicitly add it
+  // (only written when explicitly set via set_config or setup)
+
+  // Clean legacy flat fields when hosts block exists
+  if (existing.hosts && !existing.globalOverride) {
+    delete existing.cursorPeer;
+    delete existing.claudePeer;
+    // Only remove flat workspace if it duplicates a host block value
+    // (avoids breaking configs where globalOverride isn't set yet)
+    const hostWorkspaces = Object.values(existing.hosts).map((h: any) => h.workspace);
+    if (existing.workspace && hostWorkspaces.includes(existing.workspace)) {
+      delete existing.workspace;
+    }
+    delete existing.aiPeer;
+  }
+
   writeFileSync(CONFIG_FILE, JSON.stringify(existing, null, 2));
 }
 
@@ -373,10 +406,10 @@ export function getSessionName(cwd: string): string {
       }
       return base;
     }
-    case "claude-instance": {
+    case "chat-instance": {
       const instanceId = getInstanceId();
       if (instanceId) {
-        return `claude-${instanceId}`;
+        return `chat-${instanceId}`;
       }
       return base;
     }

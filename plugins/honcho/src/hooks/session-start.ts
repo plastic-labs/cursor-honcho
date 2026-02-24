@@ -3,6 +3,7 @@ import { loadConfig, getSessionForPath, setSessionForPath, getSessionName, getHo
 import {
   setCachedUserContext,
   setCachedAIContext,
+  setCachedSessionId,
   loadLocalWorkContext,
   resetMessageCount,
   setInstanceId,
@@ -121,13 +122,19 @@ Or run \`/honcho:setup\` for guided configuration.`;
     ]);
     logApiCall("honcho.session/peer", "GET", `session + 2 peers`, Date.now(), true);
 
+    // Write CWD to cache so MCP server can resolve the project directory
+    setCachedSessionId(cwd, sessionName, session.id);
+
     // Set peer observation config (fire-and-forget)
     Promise.all([
       session.setPeerConfiguration(userPeer, { observeMe: true, observeOthers: false }),
       session.setPeerConfiguration(aiPeerObj, { observeMe: false, observeOthers: true }),
     ]).catch((e) => logHook("session-start", `Set peers failed: ${e}`));
 
-    if (!getSessionForPath(cwd)) {
+    // Only persist session names for per-directory strategy (stable names).
+    // Dynamic strategies (git-branch, chat-instance) change per session,
+    // so locking them as overrides defeats the purpose.
+    if (!getSessionForPath(cwd) && (!config.sessionStrategy || config.sessionStrategy === "per-directory")) {
       setSessionForPath(cwd, sessionName);
     }
 
@@ -333,7 +340,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
     // Output host-appropriate format
     outputSessionStart({
       memoryContext: contextParts.join("\n\n"),
-      statusLine: `[honcho] Memory loaded: ${contextParts.length} sections, ${successCount}/5 sources`,
+      statusLine: `[honcho] ${config.workspace}/${sessionName} \u2022 ${successCount}/5 sources loaded`,
       aiPeer: config.aiPeer,
       showPixelArt: !isBackground && !!process.stdout.isTTY,
     });
