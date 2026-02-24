@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { homedir } from "os";
 import { join } from "path";
 import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from "fs";
@@ -25,6 +26,7 @@ interface IdCache {
   peers?: Record<string, string>; // peerName -> peerId
   sessions?: Record<string, { name: string; id: string; updatedAt: string }>; // cwd -> session info
   instanceId?: string; // Current session_id for instance tagging
+  turnId?: string; // Current turn hash — links paired messages within a single prompt/response cycle
 }
 
 export function loadIdCache(): IdCache {
@@ -92,6 +94,20 @@ export function setInstanceId(id: string): void {
   const cache = loadIdCache();
   cache.instanceId = id;
   saveIdCache(cache);
+}
+
+// Turn tracking — short hex hash linking all messages in a single prompt/response cycle
+export function newTurnId(): string {
+  const id = randomBytes(4).toString("hex"); // 8-char hex, like a short git hash
+  const cache = loadIdCache();
+  cache.turnId = id;
+  saveIdCache(cache);
+  return id;
+}
+
+export function getTurnId(): string | null {
+  const cache = loadIdCache();
+  return cache.turnId || null;
 }
 
 // ============================================
@@ -533,4 +549,31 @@ export function clearAllCaches(): void {
   if (existsSync(MESSAGE_QUEUE_FILE)) writeFileSync(MESSAGE_QUEUE_FILE, "");
   if (existsSync(GIT_STATE_FILE)) writeFileSync(GIT_STATE_FILE, "{}");
   // Don't clear work-context.md - that's valuable history
+}
+
+/** Clear only the ID cache (workspace, peer, session IDs) */
+export function clearIdCache(): void {
+  ensureCacheDir();
+  writeFileSync(ID_CACHE_FILE, "{}");
+}
+
+/** Clear only peer IDs from the ID cache */
+export function clearPeerCache(): void {
+  const cache = loadIdCache();
+  delete cache.peers;
+  saveIdCache(cache);
+}
+
+/** Clear only userContext from the context cache */
+export function clearUserContextOnly(): void {
+  const cache = loadContextCache();
+  delete cache.userContext;
+  saveContextCache(cache);
+}
+
+/** Clear only aiContext from the context cache */
+export function clearAIContextOnly(): void {
+  const cache = loadContextCache();
+  delete cache.aiContext;
+  saveContextCache(cache);
 }
