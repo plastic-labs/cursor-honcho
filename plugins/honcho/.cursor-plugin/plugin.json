@@ -13,11 +13,11 @@
   "keywords": ["memory", "context", "ai", "honcho", "persistence", "cursor"],
   "category": "productivity",
   "tags": ["memory", "persistence", "context", "agent-orchestration"],
-  "logo": "assets/logo.svg",
-  "hooks": "./hooks/hooks.json",
-  "mcpServers": "./mcp.json",
-  "skills": "./skills/",
-  "rules": "./rules/",
-  "agents": "./agents/",
-  "commands": "./commands/"
+  "logo": "../assets/logo.svg",
+  "hooks": "../hooks/hooks.json",
+  "mcpServers": "../mcp.json",
+  "skills": "../skills/",
+  "rules": "../rules/",
+  "agents": "../agents/",
+  "commands": "../commands/"
 }
