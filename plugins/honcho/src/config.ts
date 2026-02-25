@@ -382,16 +382,19 @@ export function getSessionForPath(cwd: string): string | null {
   return config.sessions[cwd] || null;
 }
 
-/** Session name derived from strategy. Manual overrides always take precedence. */
+/** Session name derived from strategy. Manual overrides only apply to per-directory. */
 export function getSessionName(cwd: string): string {
-  // Manual overrides always win
-  const configuredSession = getSessionForPath(cwd);
-  if (configuredSession) {
-    return configuredSession;
-  }
-
   const config = loadConfig();
   const strategy = config?.sessionStrategy ?? "per-directory";
+
+  // Manual overrides only apply to per-directory strategy.
+  // For chat-instance and git-branch, the session name is always derived dynamically.
+  if (strategy === "per-directory") {
+    const configuredSession = getSessionForPath(cwd);
+    if (configuredSession) {
+      return configuredSession;
+    }
+  }
   const usePrefix = config?.sessionPeerPrefix !== false; // default true
   const peerPart = config?.peerName ? sanitizeForSessionName(config.peerName) : "user";
   const repoPart = sanitizeForSessionName(basename(cwd));
