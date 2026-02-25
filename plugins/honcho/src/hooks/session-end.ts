@@ -245,6 +245,7 @@ export async function handleSessionEnd(): Promise<void> {
         const chunks = chunkContent(msg.content);
         return chunks.map(chunk =>
           userPeer.message(chunk, {
+            createdAt: msg.timestamp,
             metadata: {
               instance_id: msg.instanceId || undefined,
               session_affinity: sessionName,
@@ -283,10 +284,12 @@ export async function handleSessionEnd(): Promise<void> {
       if (assistantMessages.length > 0) {
         const meaningfulCount = assistantMessages.filter(m => m.isMeaningful).length;
 
+        const sessionEndTime = new Date().toISOString();
         const messagesToSend = assistantMessages.flatMap((msg) => {
           const chunks = chunkContent(msg.content);
           return chunks.map(chunk =>
             aiPeer.message(chunk, {
+              createdAt: sessionEndTime,
               metadata: {
                 instance_id: instanceId || undefined,
                 model: hookInput.model || undefined,

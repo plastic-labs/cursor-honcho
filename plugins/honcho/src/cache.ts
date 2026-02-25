@@ -24,7 +24,7 @@ function ensureCacheDir(): void {
 interface IdCache {
   workspace?: { name: string; id: string };
   peers?: Record<string, string>; // peerName -> peerId
-  sessions?: Record<string, { name: string; id: string; updatedAt: string }>; // cwd -> session info
+  sessions?: Record<string, { name: string; id: string; updatedAt: string; instanceId?: string }>; // cwd -> session info
   instanceId?: string; // Current session_id for instance tagging
   turnId?: string; // Current turn hash — links paired messages within a single prompt/response cycle
 }
@@ -77,11 +77,17 @@ export function getCachedSessionId(cwd: string): string | null {
   return cache.sessions?.[cwd]?.id || null;
 }
 
-export function setCachedSessionId(cwd: string, name: string, id: string): void {
+export function setCachedSessionId(cwd: string, name: string, id: string, instanceId?: string): void {
   const cache = loadIdCache();
   if (!cache.sessions) cache.sessions = {};
-  cache.sessions[cwd] = { name, id, updatedAt: new Date().toISOString() };
+  cache.sessions[cwd] = { name, id, updatedAt: new Date().toISOString(), instanceId };
   saveIdCache(cache);
+}
+
+/** Get the instance ID stored for a specific cwd (scoped, no cross-session collision) */
+export function getInstanceIdForCwd(cwd: string): string | null {
+  const cache = loadIdCache();
+  return cache.sessions?.[cwd]?.instanceId ?? null;
 }
 
 /** Find the most recently active CWD from cached sessions (fallback for MCP servers without CURSOR_PROJECT_DIR) */

@@ -123,7 +123,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
     logApiCall("honcho.session/peer", "GET", `session + 2 peers`, Date.now(), true);
 
     // Write CWD to cache so MCP server can resolve the project directory
-    setCachedSessionId(cwd, sessionName, session.id);
+    setCachedSessionId(cwd, sessionName, session.id, cursorInstanceId);
 
     // Set peer observation config (fire-and-forget)
     Promise.all([

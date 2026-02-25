@@ -6,6 +6,7 @@ import {
   isContextCacheStale,
   setCachedUserContext,
   queueMessage,
+  markMessagesUploaded,
   incrementMessageCount,
   shouldRefreshKnowledgeGraph,
   markKnowledgeGraphRefreshed,
@@ -134,7 +135,11 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   // For trivial prompts, skip heavy context retrieval but still upload
   if (shouldSkipContextRetrieval(prompt)) {
     logHook("before-submit-prompt", "Skipping context (trivial prompt)");
-    if (uploadPromise) await uploadPromise.catch((e) => logHook("before-submit-prompt", `Upload failed: ${e}`, { error: String(e) }));
+    if (uploadPromise) {
+      await uploadPromise
+        .then(() => markMessagesUploaded(cwd))
+        .catch((e) => logHook("before-submit-prompt", `Upload failed: ${e}`, { error: String(e) }));
+    }
     // Output continue with no extra context
     outputPromptContinue();
     process.exit(0);
@@ -165,7 +170,11 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
     } else {
       outputPromptContinue("[honcho] user-prompt \u2022 no cached context available");
     }
-    if (uploadPromise) await uploadPromise.catch((e) => logHook("before-submit-prompt", `Upload failed: ${e}`, { error: String(e) }));
+    if (uploadPromise) {
+      await uploadPromise
+        .then(() => markMessagesUploaded(cwd))
+        .catch((e) => logHook("before-submit-prompt", `Upload failed: ${e}`, { error: String(e) }));
+    }
     process.exit(0);
   }
 
@@ -221,7 +230,11 @@ export async function handleBeforeSubmitPrompt(): Promise<void> {
   }
 
   // Ensure upload completes before exit
-  if (uploadPromise) await uploadPromise.catch((e) => logHook("before-submit-prompt", `Upload failed: ${e}`, { error: String(e) }));
+  if (uploadPromise) {
+    await uploadPromise
+      .then(() => markMessagesUploaded(cwd))
+      .catch((e) => logHook("before-submit-prompt", `Upload failed: ${e}`, { error: String(e) }));
+  }
   process.exit(0);
 }
 
@@ -237,8 +250,10 @@ async function uploadMessageAsync(config: any, cwd: string, prompt: string, hook
   // Chunk large messages to stay under API size limits
   const instanceId = getInstanceId();
   const chunks = chunkContent(prompt);
+  const createdAt = new Date().toISOString();
   const messages = chunks.map(chunk =>
     userPeer.message(chunk, {
+      createdAt,
       metadata: {
         instance_id: instanceId || undefined,
         turn_id: turnId || undefined,
