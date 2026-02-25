@@ -39,10 +39,10 @@ AskUserQuestion:
       description: "Your name and AI name (currently: {resolved.peerName} / {resolved.aiPeer})"
     - label: "Session mapping"
       description: "How sessions are named — per directory, git branch, or per chat (currently: {resolved.sessionStrategy})"
+    - label: "Linked hosts"
+      description: "Merge context from other tools (currently: {resolved.linkedHosts || 'none'})"
     - label: "Workspace"
       description: "Data space — CAUTION: changes visible data (currently: {resolved.workspace})"
-    - label: "Host"
-      description: "Platform / local / custom URL (currently: {current.host})"
 ```
 
 If the user selects "Other", present advanced options:
@@ -52,8 +52,8 @@ AskUserQuestion:
   question: "Advanced settings:"
   header: "Advanced"
   options:
-    - label: "Linked hosts"
-      description: "Merge context from other tools"
+    - label: "Host"
+      description: "Platform / local / custom URL (currently: {current.host})"
     - label: "Context refresh"
       description: "TTL, message threshold, dialectic settings"
     - label: "Message upload"
