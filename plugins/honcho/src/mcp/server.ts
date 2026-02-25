@@ -15,7 +15,6 @@ import {
   configExists,
   getDetectedHost,
   getEndpointInfo,
-  getKnownHosts,
   getLinkedWorkspaces,
   detectHost,
   setDetectedHost,
@@ -24,9 +23,6 @@ import {
   type HonchoEnvironment,
 } from "../config.js";
 import {
-  loadIdCache,
-  loadContextCache,
-  getQueuedMessages,
   getLastActiveCwd,
   clearIdCache,
   clearPeerCache,
@@ -60,6 +56,25 @@ const ENV_SHADOW_MAP: Record<string, string> = {
 
 // Fields that require confirm=true to change
 const DANGEROUS_FIELDS = new Set(["workspace", "endpoint.environment", "endpoint.baseUrl"]);
+
+// ============================================
+// Pre-rendered status card (box-drawing)
+// ============================================
+
+function renderCard(rows: [string, string][], title: string): string {
+  const labelWidth = 12;
+  const gap = 3;
+  const maxVal = 22;
+  const ruleWidth = labelWidth + gap + maxVal + 2;
+  const top = `\u250C\u2500 ${title} ${"\u2500".repeat(Math.max(0, ruleWidth - title.length - 4))}`;
+  const bot = `\u2514${"\u2500".repeat(ruleWidth)}`;
+  const blank = "\u2502";
+  const body = rows.map(([label, value]) => {
+    const v = value.length > maxVal ? value.slice(0, maxVal - 1) + "\u2026" : value;
+    return `\u2502  ${label.padEnd(labelWidth)}${" ".repeat(gap)}${v}`;
+  });
+  return [top, blank, ...body, blank, bot].join("\n");
+}
 
 // ============================================
 // get_config handler
@@ -115,27 +130,9 @@ function handleGetConfig(cwd: string) {
   } : null;
 
   // Host info
-  const knownHosts = getKnownHosts();
   const hostInfo = {
     detected: host,
     hasHostsBlock: !!rawFile.hosts,
-    hostKeys: knownHosts,
-    otherHosts: knownHosts.filter(h => h !== host),
-  };
-
-  // Cache state
-  const idCache = loadIdCache();
-  const contextCache = loadContextCache();
-  const messageQueue = getQueuedMessages();
-
-  const cache = {
-    workspaceName: idCache.workspace?.name ?? null,
-    peerCount: idCache.peers ? Object.keys(idCache.peers).length : 0,
-    sessionCount: idCache.sessions ? Object.keys(idCache.sessions).length : 0,
-    contextAge: contextCache.userContext
-      ? Math.round((Date.now() - contextCache.userContext.fetchedAt) / 1000)
-      : null,
-    messageQueueSize: messageQueue.length,
   };
 
   // Warnings
@@ -165,14 +162,37 @@ function handleGetConfig(cwd: string) {
     warnings.push("Config has flat 'workspace' alongside hosts block but no 'globalOverride' set. The flat field is unused. Set globalOverride=true to apply it globally, or remove it.");
   }
 
-  if (cfg && idCache.workspace && idCache.workspace.name !== cfg.workspace) {
-    warnings.push(`Cache workspace "${idCache.workspace.name}" does not match config workspace "${cfg.workspace}". Consider clearing caches.`);
-  }
+  // Pre-render the status card
+  const strategyLabels: Record<string, string> = {
+    "per-directory": "per directory",
+    "git-branch": "per git branch",
+    "chat-instance": "per chat",
+  };
+  const hostLabel = endpointInfo
+    ? endpointInfo.type === "production"
+      ? `platform (app.honcho.dev)`
+      : endpointInfo.type === "local"
+        ? `local (${endpointInfo.url})`
+        : endpointInfo.url
+    : "unknown";
+  const linkedLabel = resolved?.linkedHosts?.length
+    ? resolved.linkedHosts.join(", ")
+    : "none";
+
+  const card = cfg ? renderCard([
+    ["workspace", cfg.workspace],
+    ["session", sessionName ?? "unknown"],
+    ["mapping", strategyLabels[cfg.sessionStrategy ?? "per-directory"] ?? cfg.sessionStrategy ?? "per directory"],
+    ["peer", `${cfg.peerName} / ${cfg.aiPeer}`],
+    ["host", hostLabel],
+    ["messages", cfg.saveMessages !== false ? "saving enabled" : "saving disabled"],
+    ["linked", linkedLabel],
+  ], "current honcho config") : null;
 
   return {
     content: [{
       type: "text",
-      text: JSON.stringify({ resolved, current, host: hostInfo, cache, warnings, configPath: cfgPath, configExists: cfgExists }, null, 2),
+      text: JSON.stringify({ card, resolved, current, host: hostInfo, warnings, configPath: cfgPath, configExists: cfgExists }, null, 2),
     }],
   };
 }
@@ -189,9 +209,9 @@ function handleSetConfig(args: Record<string, unknown>) {
   // Dangerous field gate
   if (DANGEROUS_FIELDS.has(field) && !confirm) {
     const descriptions: Record<string, string> = {
-      workspace: "Changing workspace switches the entire data space. All cached IDs, context, and session mappings will be invalidated. Existing data remains in the old workspace but will no longer be visible.",
-      "endpoint.environment": "Changing the endpoint switches the Honcho backend. All cached IDs and context will be invalidated.",
-      "endpoint.baseUrl": "Changing the endpoint URL switches the Honcho backend. All cached IDs and context will be invalidated.",
+      workspace: "Switches to a different workspace.",
+      "endpoint.environment": "Switches the Honcho backend.",
+      "endpoint.baseUrl": "Switches the Honcho backend URL.",
     };
     return {
       content: [{
@@ -200,7 +220,7 @@ function handleSetConfig(args: Record<string, unknown>) {
           success: false,
           field,
           requiresConfirm: true,
-          description: descriptions[field] ?? "This is a dangerous change. Pass confirm=true to proceed.",
+          description: descriptions[field] ?? "Pass confirm=true to proceed.",
         }, null, 2),
       }],
     };
