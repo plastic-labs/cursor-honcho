@@ -280,10 +280,12 @@ function handleSetConfig(args: Record<string, unknown>) {
     case "workspace":
       previousValue = cfg.workspace;
       cfg.workspace = String(value);
-      clearIdCache();
-      clearUserContextOnly();
-      clearAIContextOnly();
-      cacheInvalidation = { cleared: ["all IDs", "all context"], reason: "Workspace changed" };
+      if (String(value) !== String(previousValue)) {
+        clearIdCache();
+        clearUserContextOnly();
+        clearAIContextOnly();
+        cacheInvalidation = { cleared: ["all IDs", "all context"], reason: "Workspace changed" };
+      }
       break;
 
     case "endpoint.environment":
