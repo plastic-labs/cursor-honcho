@@ -1,49 +1,104 @@
 {
+  "version": 1,
   "hooks": {
     "sessionStart": [
       {
-        "command": "bun run ./hooks/session-start.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/session-start.ts",
+            "timeout": 30000
+          }
+        ]
       }
     ],
     "sessionEnd": [
       {
-        "command": "bun run ./hooks/session-end.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/session-end.ts",
+            "timeout": 30000
+          }
+        ]
       }
     ],
     "postToolUse": [
       {
-        "command": "bun run ./hooks/post-tool-use.ts",
-        "matcher": "Write|Edit|Shell|Task|MCP"
+        "matcher": "Write|Edit|Shell|Task|MCP",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/post-tool-use.ts",
+            "timeout": 10000
+          }
+        ]
       }
     ],
     "beforeSubmitPrompt": [
       {
-        "command": "bun run ./hooks/before-submit-prompt.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/before-submit-prompt.ts",
+            "timeout": 15000
+          }
+        ]
       }
     ],
     "preCompact": [
       {
-        "command": "bun run ./hooks/pre-compact.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/pre-compact.ts",
+            "timeout": 20000
+          }
+        ]
       }
     ],
     "stop": [
       {
-        "command": "bun run ./hooks/stop.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/stop.ts",
+            "timeout": 10000
+          }
+        ]
       }
     ],
     "subagentStop": [
       {
-        "command": "bun run ./hooks/subagent-stop.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/subagent-stop.ts",
+            "timeout": 10000
+          }
+        ]
       }
     ],
     "afterAgentThought": [
       {
-        "command": "bun run ./hooks/after-agent-thought.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/after-agent-thought.ts",
+            "timeout": 10000
+          }
+        ]
       }
     ],
     "afterAgentResponse": [
       {
-        "command": "bun run ./hooks/after-agent-response.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CURSOR_PLUGIN_ROOT}/hooks/after-agent-response.ts",
+            "timeout": 10000
+          }
+        ]
       }
     ]
   }

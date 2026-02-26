@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "fs";
 import { execSync } from "child_process";
-import { getCursorSettingsPath } from "./config.js";
+import { getSettingsPath } from "./config.js";
 
 export function checkHooksInstalled(): boolean {
-  const settingsPath = getCursorSettingsPath();
+  const settingsPath = getSettingsPath();
   if (!existsSync(settingsPath)) {
     return false;
   }

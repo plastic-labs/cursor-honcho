@@ -1,23 +1,24 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { getInstanceId, appendWork } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
 interface CursorHookInput {
-  conversation_id?: string;
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  subagent_type?: string;
+  status?: string;
+  result?: string;
+  duration?: number;
+  agent_transcript_path?: string;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  subagent_type?: string;
-  status?: string;
-  result?: string;
-  duration?: number;
-  agent_transcript_path?: string;
 }
 
 export async function handleSubagentStop(): Promise<void> {
@@ -28,13 +29,13 @@ export async function handleSubagentStop(): Promise<void> {
 
   let hookInput: CursorHookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) hookInput = JSON.parse(input);
   } catch {
     process.exit(0);
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const subagentType = hookInput.subagent_type || "unknown";
   const status = hookInput.status || "unknown";
   const result = hookInput.result || "";
@@ -64,15 +65,14 @@ export async function handleSubagentStop(): Promise<void> {
     const honcho = new Honcho(getHonchoClientOptions(config));
     const sessionName = getSessionName(cwd);
     const session = await honcho.session(sessionName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
     const instanceId = getInstanceId();
 
     logApiCall("session.addMessages", "POST", `subagent result: ${subagentType}`);
     await session.addMessages([
-      cursorPeer.message(summary, {
+      aiPeer.message(summary, {
         metadata: {
           instance_id: instanceId || undefined,
-          model: hookInput.model,
           type: "subagent_result",
           subagent_type: subagentType,
           session_affinity: sessionName,

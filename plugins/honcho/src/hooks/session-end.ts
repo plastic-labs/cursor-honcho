@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled } from "../config.js";
+import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { existsSync, readFileSync } from "fs";
 import {
   getQueuedMessages,
@@ -8,22 +8,24 @@ import {
   saveLocalWorkContext,
   loadLocalWorkContext,
   getInstanceId,
+  getTurnId,
   chunkContent,
 } from "../cache.js";
 import { playCooldown } from "../spinner.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
-interface CursorHookInput {
-  conversation_id?: string;
+interface HookInput {
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  reason?: string;
+  conversation_id?: string;
   generation_id?: string;
   model?: string;
   hook_event_name?: string;
   cursor_version?: string;
   workspace_roots?: string[];
   user_email?: string;
-  transcript_path?: string;
-  reason?: string;
   duration_ms?: number;
   is_background_agent?: boolean;
   final_status?: string;
@@ -196,9 +198,9 @@ export async function handleSessionEnd(): Promise<void> {
     process.exit(0);
   }
 
-  let hookInput: CursorHookInput = {};
+  let hookInput: HookInput = {};
   try {
-    const input = await Bun.stdin.text();
+    const input = getCachedStdin() ?? await Bun.stdin.text();
     if (input.trim()) {
       hookInput = JSON.parse(input);
     }
@@ -206,7 +208,7 @@ export async function handleSessionEnd(): Promise<void> {
     // Continue with defaults
   }
 
-  const cwd = hookInput.workspace_roots?.[0] || process.env.CURSOR_PROJECT_DIR || process.cwd();
+  const cwd = hookInput.workspace_roots?.[0] || hookInput.cwd || process.env.CURSOR_PROJECT_DIR || process.cwd();
   const reason = hookInput.reason || "unknown";
   const transcriptPath = hookInput.transcript_path;
 
@@ -225,7 +227,7 @@ export async function handleSessionEnd(): Promise<void> {
     // Get session and peers using fluent API
     const session = await honcho.session(sessionName);
     const userPeer = await honcho.peer(config.peerName);
-    const cursorPeer = await honcho.peer(config.cursorPeer);
+    const aiPeer = await honcho.peer(config.aiPeer);
 
     // Parse transcript
     const transcriptMessages = transcriptPath ? parseTranscript(transcriptPath) : [];
@@ -243,6 +245,7 @@ export async function handleSessionEnd(): Promise<void> {
         const chunks = chunkContent(msg.content);
         return chunks.map(chunk =>
           userPeer.message(chunk, {
+            createdAt: msg.timestamp,
             metadata: {
               instance_id: msg.instanceId || undefined,
               session_affinity: sessionName,
@@ -281,13 +284,15 @@ export async function handleSessionEnd(): Promise<void> {
       if (assistantMessages.length > 0) {
         const meaningfulCount = assistantMessages.filter(m => m.isMeaningful).length;
 
+        const sessionEndTime = new Date().toISOString();
         const messagesToSend = assistantMessages.flatMap((msg) => {
           const chunks = chunkContent(msg.content);
           return chunks.map(chunk =>
-            cursorPeer.message(chunk, {
+            aiPeer.message(chunk, {
+              createdAt: sessionEndTime,
               metadata: {
                 instance_id: instanceId || undefined,
-                model: hookInput.model,
+                model: hookInput.model || undefined,
                 type: msg.isMeaningful ? 'assistant_prose' : 'assistant_brief',
                 meaningful: msg.isMeaningful || false,
                 session_affinity: sessionName,
@@ -328,13 +333,15 @@ export async function handleSessionEnd(): Promise<void> {
     // =====================================================
     // Step 4: Log session end marker
     // =====================================================
+    const turnId = getTurnId();
     await session.addMessages([
-      cursorPeer.message(
+      aiPeer.message(
         `[Session ended] Reason: ${reason}, Messages: ${transcriptMessages.length}, Time: ${new Date().toISOString()}`,
         {
           metadata: {
             instance_id: instanceId || undefined,
-            model: hookInput.model,
+            turn_id: turnId || undefined,
+            model: hookInput.model || undefined,
             session_affinity: sessionName,
           },
         }

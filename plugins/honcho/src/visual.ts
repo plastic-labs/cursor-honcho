@@ -1,12 +1,8 @@
 /**
- * Visual logging for honcho hooks - adapted for Cursor
+ * Visual logging for honcho hooks
  *
- * Cursor hooks output JSON with specific fields:
- * - sessionStart: { additional_context, env, user_message }
- * - beforeSubmitPrompt: { continue, user_message }
- * - preCompact: { user_message }
- * - stop: { followup_message }
- * - postToolUse: { updated_mcp_tool_output } (MCP only)
+ * Host-specific output is handled by src/output.ts.
+ * This module provides formatting helpers and verbose file logging.
  */
 
 import { arrows, symbols } from "./unicode.js";
