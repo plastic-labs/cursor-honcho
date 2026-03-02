@@ -35,6 +35,8 @@ AskUserQuestion:
   question: "What would you like to configure?"
   header: "Config"
   options:
+    - label: "Current session"
+      description: "Switch or rename the active session (currently: {current.session})"
     - label: "Peers"
       description: "Your name and AI name (currently: {resolved.peerName} / {resolved.aiPeer})"
     - label: "Session mapping"
@@ -82,6 +84,29 @@ Then ask for the new value. Call `set_config` with `peerName` or `aiPeer`.
 ### Simple fields (Logging, etc.)
 
 Use `AskUserQuestion` to ask for the new value if there are known options, otherwise ask the user to type it. Call `set_config` with the appropriate field. Show the result.
+
+### Current session
+
+The `get_config` response includes `current.session` (the resolved name) and `current.cwd` (the directory it was resolved from). Always use `current.cwd` as the `path` when calling `sessions.set` or `sessions.remove`.
+
+```
+AskUserQuestion:
+  question: "Session '{current.session}' — what would you like to do?"
+  header: "Session"
+  options:
+    - label: "Rename / switch"
+      description: "Set a different session name for this directory"
+    - label: "Reset to default"
+      description: "Remove override, revert to computed name"
+```
+
+**If "Rename / switch":** Ask for the new session name. Explain that if the name matches an existing Honcho session, the user will reconnect to its history; if it's new, a fresh session starts. The old session is not deleted — they can switch back.
+
+Call `set_config` with `field: "sessions.set"` and `value: { path: "{current.cwd}", name: "{userInput}" }`.
+
+**If "Reset to default":** Call `set_config` with `field: "sessions.remove"` and `value: { path: "{current.cwd}" }`. Show the new computed session name from the refreshed `get_config`.
+
+Note: Rename/switch only applies to `per-directory` strategy. If the current strategy is `git-branch` or `chat-instance`, tell the user that session names are derived dynamically and cannot be overridden — suggest switching to `per-directory` strategy first.
 
 ### Session mapping
 

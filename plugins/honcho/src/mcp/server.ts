@@ -81,6 +81,13 @@ function renderCard(rows: [string, string][], title: string): string {
 // get_config handler
 // ============================================
 
+function resolveCwdSource(): { cwd: string; source: string } {
+  const cached = getLastActiveCwd();
+  if (cached) return { cwd: cached, source: "session-cache" };
+  if (process.env.CURSOR_PROJECT_DIR) return { cwd: process.env.CURSOR_PROJECT_DIR, source: "CURSOR_PROJECT_DIR" };
+  return { cwd: process.cwd(), source: "process.cwd" };
+}
+
 function handleGetConfig(cwd: string) {
   const cfg = loadConfig();
   const host = getDetectedHost();
@@ -122,9 +129,12 @@ function handleGetConfig(cwd: string) {
     ? endpointInfo.type === "production" ? "platform" : endpointInfo.type
     : null;
 
+  const cwdInfo = resolveCwdSource();
   const current = cfg ? {
     workspace: cfg.workspace,
     session: sessionName,
+    cwd,
+    cwdSource: cwdInfo.source,
     peerName: cfg.peerName,
     aiPeer: cfg.aiPeer,
     host: `${endpointLabel} (${endpointInfo?.url})`,
@@ -613,7 +623,7 @@ export async function runMcpServer(): Promise<void> {
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    const cwd = process.env.CURSOR_PROJECT_DIR || getLastActiveCwd() || process.cwd();
+    const cwd = resolveCwdSource().cwd;
 
     // ── Config tools (no Honcho session needed) ──
 
