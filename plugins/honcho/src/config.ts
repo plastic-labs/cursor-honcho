@@ -549,7 +549,7 @@ export function truncateToTokens(text: string, maxTokens: number): string {
 
 export interface HonchoClientOptions {
   apiKey: string;
-  baseUrl: string;
+  baseURL: string;
   workspaceId: string;
 }
 
@@ -567,7 +567,7 @@ export function getHonchoBaseUrl(config: HonchoConfig): string {
 export function getHonchoClientOptions(config: HonchoConfig): HonchoClientOptions {
   return {
     apiKey: config.apiKey,
-    baseUrl: getHonchoBaseUrl(config),
+    baseURL: getHonchoBaseUrl(config),
     workspaceId: config.workspace,
   };
 }
