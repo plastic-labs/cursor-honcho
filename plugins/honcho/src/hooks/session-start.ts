@@ -337,7 +337,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
         linkedWorkspaces.map(async (ws) => {
           const linkedClient = new Honcho({
             apiKey: config.apiKey,
-            baseUrl: getHonchoBaseUrl(config),
+            baseURL: getHonchoBaseUrl(config),
             workspaceId: ws,
           });
           const linkedPeer = await linkedClient.peer(config.peerName);
