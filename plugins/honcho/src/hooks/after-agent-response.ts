@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
+import { loadConfig, getDetectedHost, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { getInstanceId, getTurnId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
@@ -67,6 +67,7 @@ export async function handleAfterAgentResponse(): Promise<void> {
     await session.addMessages([
       aiPeer.message(text.slice(0, 3000), {
         metadata: {
+          source: getDetectedHost(),
           instance_id: instanceId || undefined,
           turn_id: turnId || undefined,
           type: "assistant_response",

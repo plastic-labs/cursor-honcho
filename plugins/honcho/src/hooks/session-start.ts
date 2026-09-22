@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, setSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin, getLinkedWorkspaces, getHonchoBaseUrl } from "../config.js";
+import { loadConfig, getDetectedHost, getSessionForPath, setSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin, getLinkedWorkspaces, getHonchoBaseUrl } from "../config.js";
 import {
   setCachedUserContext,
   setCachedAIContext,
@@ -145,6 +145,7 @@ Or run \`/honcho:setup\` for guided configuration.`;
         .map((change) =>
           userPeer.message(`[Git External] ${change.description}`, {
             metadata: {
+              source: getDetectedHost(),
               type: "git_change",
               change_type: change.type,
               from: change.from,

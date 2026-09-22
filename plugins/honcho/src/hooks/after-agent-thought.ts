@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
+import { loadConfig, getDetectedHost, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { getInstanceId, getTurnId } from "../cache.js";
 import { logHook, setLogContext } from "../log.js";
 
@@ -59,6 +59,7 @@ export async function handleAfterAgentThought(): Promise<void> {
     await session.addMessages([
       aiPeer.message(`[Reasoning] ${truncated}`, {
         metadata: {
+          source: getDetectedHost(),
           instance_id: instanceId || undefined,
           turn_id: turnId || undefined,
           type: "agent_thought",

@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
+import { loadConfig, getDetectedHost, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { existsSync, readFileSync } from "fs";
 import {
   getQueuedMessages,
@@ -247,6 +247,7 @@ export async function handleSessionEnd(): Promise<void> {
           userPeer.message(chunk, {
             createdAt: msg.timestamp,
             metadata: {
+              source: getDetectedHost(),
               instance_id: msg.instanceId || undefined,
               session_affinity: sessionName,
             },
@@ -291,6 +292,7 @@ export async function handleSessionEnd(): Promise<void> {
             aiPeer.message(chunk, {
               createdAt: sessionEndTime,
               metadata: {
+                source: getDetectedHost(),
                 instance_id: instanceId || undefined,
                 model: hookInput.model || undefined,
                 type: msg.isMeaningful ? 'assistant_prose' : 'assistant_brief',
@@ -339,6 +341,7 @@ export async function handleSessionEnd(): Promise<void> {
         `[Session ended] Reason: ${reason}, Messages: ${transcriptMessages.length}, Time: ${new Date().toISOString()}`,
         {
           metadata: {
+            source: getDetectedHost(),
             instance_id: instanceId || undefined,
             turn_id: turnId || undefined,
             model: hookInput.model || undefined,
