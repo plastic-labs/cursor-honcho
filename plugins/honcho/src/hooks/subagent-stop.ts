@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
+import { loadConfig, getDetectedHost, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { getInstanceId, appendWork } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 
@@ -72,6 +72,7 @@ export async function handleSubagentStop(): Promise<void> {
     await session.addMessages([
       aiPeer.message(summary, {
         metadata: {
+          source: getDetectedHost(),
           instance_id: instanceId || undefined,
           type: "subagent_result",
           subagent_type: subagentType,

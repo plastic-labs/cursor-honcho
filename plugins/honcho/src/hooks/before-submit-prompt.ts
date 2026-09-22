@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin, getLinkedWorkspaces, getHonchoBaseUrl } from "../config.js";
+import { loadConfig, getDetectedHost, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin, getLinkedWorkspaces, getHonchoBaseUrl } from "../config.js";
 import {
   getCachedUserContext,
   getStaleCachedUserContext,
@@ -255,6 +255,7 @@ async function uploadMessageAsync(config: any, cwd: string, prompt: string, hook
     userPeer.message(chunk, {
       createdAt,
       metadata: {
+        source: getDetectedHost(),
         instance_id: instanceId || undefined,
         turn_id: turnId || undefined,
         session_affinity: sessionName,

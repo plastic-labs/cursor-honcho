@@ -1,5 +1,5 @@
 import { Honcho } from "@honcho-ai/sdk";
-import { loadConfig, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
+import { loadConfig, getDetectedHost, getSessionForPath, getSessionName, getHonchoClientOptions, isPluginEnabled, getCachedStdin } from "../config.js";
 import { appendWork, getInstanceId } from "../cache.js";
 import { logHook, logApiCall, setLogContext } from "../log.js";
 import { outputToolCapture } from "../output.js";
@@ -267,6 +267,7 @@ async function logToHonchoAsync(config: any, cwd: string, summary: string): Prom
   await session.addMessages([
     aiPeer.message(`[Tool] ${summary}`, {
       metadata: {
+        source: getDetectedHost(),
         instance_id: instanceId || undefined,
         turn_id: turnId || undefined,
         session_affinity: sessionName,
