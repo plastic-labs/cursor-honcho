@@ -1,5 +1,8 @@
 # Honcho Plugins
 
+> [!IMPORTANT]
+> **This repository is archived.** The Honcho plugin for Cursor (and Grok Bot) now lives in the Honcho monorepo at [`integrations/cursor`](https://github.com/plastic-labs/honcho/tree/main/integrations/cursor). Install it from Cursor's plugin marketplace by following the [Cursor guide](https://docs.honcho.dev/v3/guides/integrations/cursor), and open issues and pull requests on [plastic-labs/honcho](https://github.com/plastic-labs/honcho). The rest of this README describes the old standalone plugin and is no longer maintained.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Honcho](https://img.shields.io/badge/Honcho-Memory%20API-blue)](https://honcho.dev)
 
